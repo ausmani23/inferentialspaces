@@ -339,6 +339,7 @@ output(plotdf,tmpname)
 
 plotdf <- biasdf[
   oldvar%in%c("r2") &
+    world=='nodiscrimination' &
     model=="normal",
   .(
     mu = 1 - median(mu)
@@ -398,6 +399,72 @@ gs.list[[tmpname]]<-list(
   height=3*1.5
 )
 output(plotdf,tmpname)
+
+#########################################################
+#########################################################
+
+#1-3 PLOT COEFS/LUCK TOGETHER AS EXPLAINED
+
+plotdf <- biasdf[
+  model=='normal_relimp' &
+    world=='nodiscrimination'
+  ,
+  .(
+    mu = median(mu,na.rm=T)
+  )
+  ,
+  by=c(
+    'group',
+    'oldvar',
+    'seed'
+  )
+]
+plotdf<-plotdf[
+  ,
+  .(
+    mu=quantile(mu,0.5),
+    mu.min=quantile(mu,0.025),
+    mu.max=quantile(mu,0.975)
+  )
+  ,
+  by=c(
+    'group',
+    'oldvar'
+  )
+  ]
+
+ggplot(
+  plotdf,
+  aes(
+    x=oldvar,
+    y=mu,
+    ymin=mu.min,
+    ymax=mu.max,
+    color=oldvar
+  )
+) +
+  geom_point(
+    size=2,
+    position=position_dodge(0.4)
+  ) +
+  geom_linerange(
+    size=1.25,
+    position=position_dodge(0.4)
+  ) +
+  scale_color_discrete(
+    name="Social World"
+  ) +
+  facet_wrap(
+    ~ group 
+  ) +
+  coord_flip() +
+  xlab("") + 
+  ylab("\nLuck (i.e. 1 - R^2)") +
+  theme_bw()
+
+
+
+
 
 #########################################################
 #########################################################

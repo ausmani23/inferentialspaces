@@ -128,13 +128,13 @@ tmplevels<-c(
   "earnings95"
 )
 tmplabels<-c(
-  "No Segregation",
+  "Integrated",
   "Neighborhood",
   "Mostly Neighborhood",
   "School",
   "Mostly School",
-  "Income",
-  "Mostly Income"
+  "Job",
+  "Mostly Job"
 )
 biasdf$group<-factor(
   biasdf$group,
@@ -177,450 +177,226 @@ biasdf$var<-factor(
 #########################################################
 #########################################################
 
-#(1)
-#SHOW THAT CAUSAL INFERENCES ABOUT RACE AND INCOME SUFFER
-#whether sampling on nhood, school or income, 
-#these inferences suffer
+# #(1)
+# #SHOW THAT CAUSAL INFERENCES ABOUT RACE AND INCOME SUFFER
+# #whether sampling on nhood, school or income, 
+# #these inferences suffer
+# 
+# #(2) 
+# #SHOW THAT CAUSAL INFERENCES ABOUT ABILITY SUFFER DIFFERENTLY
+# #neighborhood samplers see ability just fine
+# #school samplers only see a little of it
+# #income samplers see none of it
+# 
+# plotdf<-biasdf[
+#   model=="normal" & 
+#     luck==1 & 
+#     var%in%c('Class','Race','Ability')  &
+#     group!="Random" &
+#     world=="nodiscrimination"
+#   ]
+# 
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu_bias=median(mu_bias,na.rm=T)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var',
+#     'seed'
+#   )
+#   ]
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=quantile(mu_bias,0.5),
+#     mu.min=quantile(mu_bias,0.025),
+#     mu.max=quantile(mu_bias,0.975)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var'
+#   )
+#   ]
+# 
+# g.tmp<-ggplot(
+#   plotdf,
+#   aes(
+#     x=var,
+#     y=mu,
+#     ymin=mu.min,
+#     ymax=mu.max,
+#     group=group,
+#     color=group
+#   )
+# ) +
+#   geom_point(
+#     position=position_dodge(0.4)
+#   ) +
+#   geom_linerange(
+#     position=position_dodge(0.4)
+#   ) +
+#   scale_color_discrete(
+#     name="Social World"
+#   ) +
+#   coord_flip() +
+#   theme_bw() +
+#   ylab("\nBias") +
+#   xlab("") 
+# 
+# # tmpname<-"fig_inferences_bias.pdf"
+# # gs.list[[tmpname]]<-list(
+# #   graph=g.tmp,
+# #   filename=tmpname,
+# #   width=4*1.5,
+# #   height=3*1.5
+# # )
+# # output(plotdf,tmpname)
+# 
+# 
+# #(3) PLOT ACTUAL COEFFICIENTS
+# 
+# plotdf<-biasdf[
+#   model=="normal" & 
+#     var%in%c('Class','Race','Ability') &
+#     world=='nodiscrimination'
+#   ]
+# 
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=median(mu,na.rm=T)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var',
+#     'seed'
+#   )
+#   ]
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=quantile(mu,0.5),
+#     mu.min=quantile(mu,0.025),
+#     mu.max=quantile(mu,0.975)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var'
+#   )
+#   ]
+# 
+# g.tmp<-ggplot(
+#   plotdf,
+#   aes(
+#     x=var,
+#     y=mu,
+#     ymin=mu.min,
+#     ymax=mu.max,
+#     group=group,
+#     color=group
+#   )
+# ) +
+#   geom_point(
+#     size=2,
+#     position=position_dodge(0.4)
+#   ) +
+#   geom_linerange(
+#     size=1.25,
+#     position=position_dodge(0.4)
+#   ) +
+#   geom_line(
+#     alpha=0.25,
+#     size=2,
+#     position=position_dodge(0.4)
+#   ) +
+#   scale_color_discrete(
+#     name="Social World"
+#   ) +
+#   coord_flip() +
+#   theme_bw() +
+#   ylab("\nEstimated Effect on Earnings") +
+#   xlab("") 
 
-#(2) 
-#SHOW THAT CAUSAL INFERENCES ABOUT ABILITY SUFFER DIFFERENTLY
-#neighborhood samplers see ability just fine
-#school samplers only see a little of it
-#income samplers see none of it
-
-plotdf<-biasdf[
-  model=="normal" & 
-    luck==1 & 
-    var%in%c('Class','Race','Ability')  &
-    group!="Random" &
-    world=="nodiscrimination"
-  ]
-
-plotdf<-plotdf[
-  ,
-  .(
-    mu_bias=median(mu_bias,na.rm=T)
-  )
-  ,
-  by=c(
-    'group',
-    'var',
-    'seed'
-  )
-  ]
-plotdf<-plotdf[
-  ,
-  .(
-    mu=quantile(mu_bias,0.5),
-    mu.min=quantile(mu_bias,0.025),
-    mu.max=quantile(mu_bias,0.975)
-  )
-  ,
-  by=c(
-    'group',
-    'var'
-  )
-  ]
-
-g.tmp<-ggplot(
-  plotdf,
-  aes(
-    x=var,
-    y=mu,
-    ymin=mu.min,
-    ymax=mu.max,
-    group=group,
-    color=group
-  )
-) +
-  geom_point(
-    position=position_dodge(0.4)
-  ) +
-  geom_linerange(
-    position=position_dodge(0.4)
-  ) +
-  scale_color_discrete(
-    name="Social World"
-  ) +
-  coord_flip() +
-  theme_bw() +
-  ylab("\nBias") +
-  xlab("") 
-
-tmpname<-"fig_inferences_bias.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
-  filename=tmpname,
-  width=4*1.5,
-  height=3*1.5
-)
-output(plotdf,tmpname)
-
-
-#(3) PLOT ACTUAL COEFFICIENTS
-
-plotdf<-biasdf[
-  model=="normal" & 
-    var%in%c('Class','Race','Ability') &
-    world=='nodiscrimination'
-  ]
-
-plotdf<-plotdf[
-  ,
-  .(
-    mu=median(mu,na.rm=T)
-  )
-  ,
-  by=c(
-    'group',
-    'var',
-    'seed'
-  )
-  ]
-plotdf<-plotdf[
-  ,
-  .(
-    mu=quantile(mu,0.5),
-    mu.min=quantile(mu,0.025),
-    mu.max=quantile(mu,0.975)
-  )
-  ,
-  by=c(
-    'group',
-    'var'
-  )
-  ]
-
-g.tmp<-ggplot(
-  plotdf,
-  aes(
-    x=var,
-    y=mu,
-    ymin=mu.min,
-    ymax=mu.max,
-    group=group,
-    color=group
-  )
-) +
-  geom_point(
-    size=2,
-    position=position_dodge(0.4)
-  ) +
-  geom_linerange(
-    size=1.25,
-    position=position_dodge(0.4)
-  ) +
-  geom_line(
-    alpha=0.25,
-    size=2,
-    position=position_dodge(0.4)
-  ) +
-  scale_color_discrete(
-    name="Social World"
-  ) +
-  coord_flip() +
-  theme_bw() +
-  ylab("\nEstimated Effect on Earnings") +
-  xlab("") 
-
-tmpname<-"fig_inferences.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
-  filename=tmpname,
-  width=4*1.5,
-  height=3*1.5
-)
-output(plotdf,tmpname)
+# tmpname<-"fig_inferences.pdf"
+# gs.list[[tmpname]]<-list(
+#   graph=g.tmp,
+#   filename=tmpname,
+#   width=4*1.5,
+#   height=3*1.5
+# )
+# output(plotdf,tmpname)
 
 #########################################################
 #########################################################
 
 #(3) PLOT LUCK; HOW MUCH CAN'T THE ESTIMATES EXPLAIN?
 
-plotdf <- biasdf[
-  oldvar%in%c("r2") &
-    world=='nodiscrimination' &
-    model=="normal",
-  .(
-    mu = 1 - median(mu)
-  )
-  ,
-  by=c(
-    'group',
-    'oldvar',
-    'seed'
-  )
-  ]
-plotdf<-plotdf[
-  ,
-  .(
-    mu=quantile(mu,0.5),
-    mu.min=quantile(mu,0.025),
-    mu.max=quantile(mu,0.975)
-  )
-  ,
-  by=c(
-    'group',
-    'oldvar'
-  )
-  ]
-
-g.tmp <- ggplot(
-  plotdf,
-  aes(
-    x=group,
-    y=mu,
-    ymin=mu.min,
-    ymax=mu.max,
-    color=group
-  )
-) +
-  geom_point(
-    size=2,
-    position=position_dodge(0.4)
-  ) +
-  geom_linerange(
-    size=1.25,
-    position=position_dodge(0.4)
-  ) +
-  scale_color_discrete(
-    name="Social World"
-  ) +
-  coord_flip() +
-  xlab("") + 
-  ylab("\nLuck (i.e. 1 - R^2)") +
-  theme_bw()
-
-tmpname<-"fig_luck.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
-  filename=tmpname,
-  width=4*1.5,
-  height=3*1.5
-)
-output(plotdf,tmpname)
-
-#########################################################
-#########################################################
-
-#1-3 PLOT COEFS/LUCK TOGETHER AS EXPLAINED
-
-plotdf <- biasdf[
-  model=='normal_relimp' &
-    world=='nodiscrimination'
-  ,
-  .(
-    mu = median(mu,na.rm=T)
-  )
-  ,
-  by=c(
-    'group',
-    'oldvar',
-    'seed'
-  )
-]
-plotdf<-plotdf[
-  ,
-  .(
-    mu=quantile(mu,0.5),
-    mu.min=quantile(mu,0.025),
-    mu.max=quantile(mu,0.975)
-  )
-  ,
-  by=c(
-    'group',
-    'oldvar'
-  )
-  ]
-
-ggplot(
-  plotdf,
-  aes(
-    x=oldvar,
-    y=mu,
-    ymin=mu.min,
-    ymax=mu.max,
-    color=oldvar
-  )
-) +
-  geom_point(
-    size=2,
-    position=position_dodge(0.4)
-  ) +
-  geom_linerange(
-    size=1.25,
-    position=position_dodge(0.4)
-  ) +
-  scale_color_discrete(
-    name="Social World"
-  ) +
-  facet_wrap(
-    ~ group 
-  ) +
-  coord_flip() +
-  xlab("") + 
-  ylab("\nLuck (i.e. 1 - R^2)") +
-  theme_bw()
-
-
-
-
-
-#########################################################
-#########################################################
-
-#DEPRECATED; 
-#works, but we decided this is not all that 
-#useful a way of visualizing the results
-
-# #MAKE THE FOREGOING VIVID BY ILLUSTRATING 
-# #HOW AVG/MEDIAN PERSON SEES THE INCOME, RACE AND ABILITY GRADIENTS
-# 
-# tmpdf<-inferencesdf[
-#   model=='normal' &
-#     world=='nodiscrimination'
-#   ,
+# plotdf <- biasdf[
+#   oldvar%in%c("r2") &
+#     world=='nodiscrimination' &
+#     model=="normal",
 #   .(
-#     intercept=median(mu[var=="(Intercept)"],na.rm=T),
-#     income_i=median(mu[var=="income_i"],na.rm=T),
-#     ability_i=median(mu[var=="ability_i"],na.rm=T),
-#     race_i=median(mu[var=="race_i"],na.rm=T)
-#   ),
+#     mu = 1 - median(mu)
+#   )
+#   ,
 #   by=c(
-#     'network',
+#     'group',
+#     'oldvar',
 #     'seed'
 #   )
 #   ]
-# tmpdf$modnum<-1:nrow(tmpdf)
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=quantile(mu,0.5),
+#     mu.min=quantile(mu,0.025),
+#     mu.max=quantile(mu,0.975)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'oldvar'
+#   )
+#   ]
 # 
-# predictdf<-expand.grid(
-#   intercept=1,
-#   race_i=c(0,1),
-#   income_i=seq(-3,3,by=0.05),
-#   ability_i=c(-3,3,by=0.05)
-# )
-# predictdf$prednum<-1:nrow(predictdf)
-# 
-# #get predictionfs
-# tmpvars<-c(
-#   "intercept",
-#   "income_i",
-#   "ability_i",
-#   "race_i"
-# )
-# yhat<-as.matrix(tmpdf[,tmpvars,with=F]) %*% 
-#   as.matrix(t(predictdf[,tmpvars]))
-# yhatdf<-data.frame(yhat)
-# yhatdf$modnum<-1:nrow(yhatdf)
-# gathcols<-names(yhatdf)[str_detect(names(yhatdf),"X")]
-# yhatdf<-gather_(
-#   yhatdf,
-#   "prednum",
-#   "yhat",
-#   gathcols
-# )
-# yhatdf$prednum<-
-#   str_replace(yhatdf$prednum,"X","") %>% 
-#   as.numeric
-# 
-# #merge relevant info
-# yhatdf<-merge(
-#   yhatdf,
-#   tmpdf[,c('modnum','network','seed')],
-#   by='modnum'
-# )
-# yhatdf$modnum<-NULL
-# yhatdf<-merge(
-#   yhatdf,
-#   predictdf[,c('prednum','race_i','income_i',"ability_i")],
-#   by='prednum'
-# )
-# 
-# #get intervals
-# yhatdf<-data.table(yhatdf)
-# 
-# #fix groups
-# tmplevels<-c(
-#   "random",
-#   "nhood",
-#   "nhood95",
-#   "school",
-#   "school95",
-#   "earnings",
-#   "earnings95"
-# )
-# tmplabels<-c(
-#   "No Segregation",
-#   "At Neighborhood",
-#   "Most At Neighborhood",
-#   "At School",
-#   "Most At School",
-#   "By Income",
-#   "Most By Income"
-# )
-# 
-# yhatdf$group<-factor(
-#   yhatdf$network,
-#   tmplevels,
-#   tmplabels
-# )
-# yhatdf$network<-NULL
-# 
-# #ILLUSTRATE
-# 
-# tmpvars<-c(
-#   "income_i",
-#   "ability_i",
-#   "race_i"
-# )
-# plotdf<-lapply(tmpvars,function(v) {
-#   tmpdf<-yhatdf[
-#     ,
-#     .(
-#       yhat=quantile(yhat,0.5,na.rm=T),
-#       yhat.min=quantile(yhat,0.025,na.rm=T),
-#       yhat.max=quantile(yhat,0.975,na.rm=T)
-#     )
-#     ,
-#     by=c(
-#       'group',
-#       v
-#     )
-#     ]
-#   tmpdf$x <- tmpdf[[v]]; tmpdf[[v]]<-NULL
-#   tmpdf$facet <- v
-#   tmpdf
-# }) %>% rbind.fill
-# 
-# 
-# g.tmp<-ggplot(
+# g.tmp <- ggplot(
 #   plotdf,
 #   aes(
-#     x=x,
-#     y=yhat,
-#     group=group,
-#     color=group,
-#     fill=group
+#     x=group,
+#     y=mu,
+#     ymin=mu.min,
+#     ymax=mu.max,
+#     color=group
 #   )
 # ) +
-#   geom_line(
-#     size=1
+#   geom_point(
+#     size=2,
+#     position=position_dodge(0.4)
 #   ) +
-#   xlab("\nAbillity, Class or Race") +
-#   ylab("Predicted Earnings (SDs Above Avg.)\n") +
-#   facet_wrap(
-#     ~ facet,
-#     scales='free',
-#     ncol=1
-#   ) + 
+#   geom_linerange(
+#     size=1.25,
+#     position=position_dodge(0.4)
+#   ) +
+#   scale_color_discrete(
+#     name="Social World"
+#   ) +
+#   coord_flip() +
+#   xlab("") + 
+#   ylab("\nLuck (i.e. 1 - R^2)") +
 #   theme_bw()
 # 
-# tmpname<-"fig_predictions.pdf"
+# tmpname<-"fig_luck.pdf"
 # gs.list[[tmpname]]<-list(
 #   graph=g.tmp,
 #   filename=tmpname,
-#   width=5.1,
-#   height=7.6
+#   width=4*1.5,
+#   height=3*1.5
 # )
 # output(plotdf,tmpname)
 
@@ -629,10 +405,105 @@ ggplot(
 
 #(4) INFERENCES ABOUT INEQUALITY
 
-plotdf<-biasdf[
+# plotdf<-biasdf[
+#   model=='inequality' &
+#     world=='nodiscrimination'
+#   ]
+# 
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=median(mu,na.rm=T)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var',
+#     'seed'
+#   )
+#   ]
+# plotdf<-plotdf[
+#   ,
+#   .(
+#     mu=quantile(mu,0.5),
+#     mu.min=quantile(mu,0.025),
+#     mu.max=quantile(mu,0.975)
+#   )
+#   ,
+#   by=c(
+#     'group',
+#     'var'
+#   )
+#   ]
+# 
+# g.tmp<-ggplot(
+#   plotdf,
+#   aes(
+#     x=group,
+#     y=mu,
+#     ymin=mu.min,
+#     ymax=mu.max,
+#     color=group
+#   )
+# ) +
+#   geom_point(
+#     size=2,
+#     position=position_dodge(0.4)
+#   ) +
+#   geom_linerange(
+#     size=1.25,
+#     position=position_dodge(0.4)
+#   ) +
+#   scale_color_discrete(
+#     guide=F
+#   ) +
+#   coord_flip() +
+#   xlab("") + 
+#   ylab("\nObserved Inequality in Final Income") +
+#   theme_bw()
+
+# tmpname<-"fig_inequality.pdf"
+# gs.list[[tmpname]]<-list(
+#   graph=g.tmp,
+#   filename=tmpname,
+#   width=4*1.5,
+#   height=3*1.5
+# )
+# output(plotdf,tmpname)
+
+#########################################################
+#########################################################
+
+#PLOT ALL INFERENCES TOGETHER
+#(replaces all figs above)
+
+tmpdf1<-biasdf[
+  model=="normal" & 
+    var%in%c('Class','Race','Ability') &
+    world=='nodiscrimination'
+  ]
+tmpdf1$inference<-c("Causal (Coefficients)")
+tmpdf2<-biasdf[
   model=='inequality' &
     world=='nodiscrimination'
   ]
+tmpdf2$var<-c("Inequality")
+tmpdf2$inference<-c("Descriptive")
+
+tmpdf3<-biasdf[
+    oldvar%in%c("r2") & 
+      world=="nodiscrimination" & 
+      model=="normal"
+]
+tmpdf3$mu <- 1 - tmpdf3$mu
+tmpdf3$var<-c("Luck")
+tmpdf3$inference<-c("Causal (Luck)")
+
+plotdf<-rbind.fill(
+  tmpdf1,
+  tmpdf2,
+  tmpdf3
+) %>% data.table
 
 plotdf<-plotdf[
   ,
@@ -641,6 +512,7 @@ plotdf<-plotdf[
   )
   ,
   by=c(
+    'inference',
     'group',
     'var',
     'seed'
@@ -655,15 +527,23 @@ plotdf<-plotdf[
   )
   ,
   by=c(
+    'inference',
     'group',
     'var'
   )
   ]
 
-g.tmp<-ggplot(
+tmplevels <- c(
+  "Descriptive",
+  "Causal (Coefficients)",
+  "Causal (Luck)"
+)
+
+
+g.tmp <- ggplot(
   plotdf,
   aes(
-    x=group,
+    x=var,
     y=mu,
     ymin=mu.min,
     ymax=mu.max,
@@ -683,17 +563,28 @@ g.tmp<-ggplot(
   ) +
   coord_flip() +
   xlab("") + 
-  ylab("\nObserved Inequality (Variance) in Final Income") +
+  ylab("\nEstimate") +
+  # facet_wrap(
+  #   inference ~ .,
+  #   ncol=1,
+  #   scales='free'
+  # ) +
   theme_bw()
+g.tmp <- g.tmp + ggforce::facet_col(
+  vars(inference), 
+  scales='free',
+  space='free'
+)
 
-tmpname<-"fig_inequality.pdf"
+tmpname<-"fig_inferences.pdf"
 gs.list[[tmpname]]<-list(
   graph=g.tmp,
   filename=tmpname,
   width=4*1.5,
-  height=3*1.5
+  height=5*1.5
 )
 output(plotdf,tmpname)
+
 
 #########################################################
 #########################################################
@@ -706,7 +597,7 @@ tmpdfs<-list()
 #(above we show conditional racial gap; here we want to show overall)
 #(2) constrained estimators will attribute a larger share 
 #of the racial gap they see to discrimination
-#(3) constrianed estimators will underestimate the level of intra-minotiry inequality
+#(3) constrianed estimators will 
 
 #RACIAL GAP + DISCRIMINATION
 tmpdf<-biasdf[
@@ -722,8 +613,7 @@ tmpdf<-spread(
 )
 
 #what fraction of the racial gap is attributed to discrimination? 
-tmpdf$pct_discrimination <- 
-100 - 100 * (tmpdf$race - tmpdf$discrimination)/tmpdf$race
+tmpdf$pct_discrimination <- 100 * tmpdf$discrimination/tmpdf$race
 tmpdf$racialgap <-
   tmpdf$race
 #median pct_discimrination and racial gapin a given world
@@ -751,13 +641,19 @@ tmpdfs[['racialgap+discrimination']]<-tmpdf
 
 #calculate within-minority inequality
 tmpdf<-biasdf[
-  model=='mininequality' & 
+  model%in%c('betweenss','totalss') & 
     world=='yesdiscrimination'
 ]
+tmpdf$mu_bias<-NULL
+tmpdf<-spread(
+  tmpdf,
+  model,
+  mu
+)
 tmpdf<-tmpdf[
   ,
   .(
-    withininequality = median(mu)
+    betweenshare = 100 * median(betweenss/totalss)
   )
   ,
   by=c(
@@ -770,9 +666,9 @@ tmpdf <- gather(
   tmpdf,
   stat,
   mu,
-  withininequality
+  betweenshare
 ) %>% data.table
-tmpdfs[['withininequality']]<-tmpdf
+tmpdfs[['betweeninequality']]<-tmpdf
 
 #put them together
 tmpdf<-rbind.fill(
@@ -795,14 +691,14 @@ plotdf<-tmpdf[
   ]
 
 tmplevels<-c(
-  "withininequality",
   "racialgap",
+  "betweenshare",
   "pct_discrimination"
 )
 tmplabels<-c(
-  "Intraracial Inequality",
-  "Racial Gap (Unadjusted)",
-  "% of Gap Due to Discrimination"
+  "Total Racial Gap",
+  "Between-Race Inequality as % of Total",
+  "% of Gap Due to Present-Day Discrimination"
 )
 plotdf$stat <- factor(
   plotdf$stat,
@@ -830,12 +726,13 @@ g.tmp<-ggplot(
     position=position_dodge(0.4)
   ) +
   scale_color_discrete(
-    name="Social World"
+    guide=F
   ) +
   coord_flip() +
   facet_wrap(
     ~ stat,
-    scales='free_x'
+    scales='free_x',
+    ncol=1
   ) +
   ylab("") +
   xlab("") +
@@ -845,8 +742,8 @@ tmpname<-"fig_race.pdf"
 gs.list[[tmpname]]<-list(
   graph=g.tmp,
   filename=tmpname,
-  width=4*1.5,
-  height=3*1.5
+  width=4.5*1.5,
+  height=4.5*1.5
 )
 output(plotdf,tmpname)
 

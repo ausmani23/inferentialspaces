@@ -49,7 +49,7 @@ gs.list<-list()
 #loop through these
 loopdf<-expand.grid(
   #many worlds
-  seed=1:5,
+  seed=1:100,
   #number of agents
   N_agents=1000,
   #network size
@@ -156,7 +156,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
     #brute luck
     rnorm(thisrow$N_agents,sd=thisrow$luck)
   
-  #rescale?
+  #rescale?   
   if(thisrow$rescale) 
     agentsdf$income_i <- scale(agentsdf$income_i)
   
@@ -333,17 +333,32 @@ fulloutput<-lapply(loopdf$i,function(i) {
       agentid=j,
       model=c(
         'inequality',
-        'mininequality',
-        'majinequality'
+        'totalss',
+        'withinss',
+        'betweenss'
       ),
       var="var",
       mu=c(
         var(mydf$earnings_f),
-        var(mydf$earnings_f[mydf$race_i==0]),
-        var(mydf$earnings_f[mydf$race_i==1])
+        (mydf$earnings_f - mean(mydf$earnings_f))^2 %>% sum,
+        tapply(mydf$earnings_f,mydf$race_i,function(x) sum((x - mean(x))^2 ) ) %>% sum,
+        (unlist(
+            tapply(mydf$earnings_f,mydf$race_i,function(x) rep(mean(x),length(x)) )
+          ) - mean(mydf$earnings_f))^2 %>% sum
       )
     )
     tmpdfs[['descriptive']]<-tmpdf
+    
+    ggplot(
+      mydf,
+      aes(
+        x=earnings_f,
+        group=race_i,
+        fill=race_i
+      )
+    ) + 
+      geom_density()
+    
     
     ###causal inference about inequality of earnings
     

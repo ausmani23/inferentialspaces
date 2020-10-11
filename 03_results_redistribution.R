@@ -133,7 +133,7 @@ tmpdf<-inferencesdf[
     class = mu[model=='normal' & var=='income_i'],
     race = mu[model=='normal' & var=='race_i'],
     ability = mu[model=='normal' & var=='ability_i'],
-    luck = 1 - mu[model=='normal' & var=='r2']
+    luckest = 1 - mu[model=='normal' & var=='r2']
   )
   ,
   by=c(
@@ -154,40 +154,43 @@ fulldf <- merge(
   by=c('i','agentid')
 )
 #standardize all vars across all agents/sims
-tmpvars<-c('ability','class','descriptive','ownincome','luck','race')
+tmpvars<-c('ability','class','descriptive','ownincome','luckest','race')
 for(v in tmpvars) {
   fulldf[[v]] <- scale(fulldf[[v]])[,1]
 }
 
+#########################################################
+#########################################################
+
+#mapping
+
 #we are going to map these via inverse logit
 #to obtain attitudes towards redistribution on 0-1 scale
 coefsdf <- expand.grid(
-  ##these are pretty obvious
-  theta_class = c(1),
-  theta_race = c(1),
-  theta_ability = c(-1),
+  ##this is default
   theta_ownincome = c(-1),
-  ###these, up for grabs;
-  ###we'll want a preference, 
-  ###and then we can have robustness
+  ##these vary together
+  theta_class = c(0,1),
+  theta_race = c(0,1),
+  theta_ability = c(0,-1),
+  ##inequality
   theta_descriptive = c(0,1),
-  theta_luck = c(0,1)
+  ##luck
+  theta_luckest = c(0,1)
 )
 
-# #trim to preferred model
-# tmp<-coefsdf$theta_descriptive==0 & 
-#   coefsdf$theta_class==1 & 
-#   coefsdf$theta_race==1 & 
-#   coefsdf$theta_ability==-1 &
-#   coefsdf$theta_ownincome==1 & 
-#   coefsdf$theta_luck==1
-#coefsdf <- coefsdf[tmp,]
-
+#number mods
 coefsdf$modnum <- 1:nrow(coefsdf)
 
 #prep for loop
 mycoefs <- names(coefsdf)[!names(coefsdf)%in%c('modnum')]
 myvars <- str_replace(mycoefs,"theta\\_","")
+
+####
+#remove all in which inferences don't vary together
+tmp<-coefsdf$theta_race==coefsdf$theta_class & 
+  coefsdf$theta_class==(-1*coefsdf$theta_ability)
+coefsdf<-coefsdf[tmp,]
 
 #now, loop through
 tmpseq.i <- 1:nrow(coefsdf)
@@ -202,23 +205,25 @@ phatdf <- lapply(tmpseq.i,function(i) {
     t(as.matrix(thiscoefs))
 
   #apply inverse logit link to this yhats
-  phat <- 1/(1 + exp(-1 * yhat)) 
+  #phat <- 1/(1 + exp(-1 * yhat)) #equivalent
+  phat <- exp(yhat)/( exp(yhat) + 1)
   
   data.frame(
     modnum=thisrow$modnum,
     i=fulldf$i,
     agentid=fulldf$agentid,
     phat = as.vector(phat),
+    ownincome = fulldf$ownincome,
     owincome_ptile = ecdf(fulldf$ownincome)(fulldf$ownincome)
   )
-}) %>% rbind.fill
+}) %>% rbind.fill %>% data.table
 
 #merge
 fulldf <- merge(
   phatdf,
   coefsdf,
   by='modnum'
-)
+) 
 fulldf <- merge(
   fulldf,
   loopdf,
@@ -241,13 +246,13 @@ tmplevels<-c(
   "earnings95"
 )
 tmplabels<-c(
-  "No Segregation",
+  "Integrated",
   "Neighborhood",
   "Mostly Neighborhood",
   "School",
   "Mostly School",
-  "Income",
-  "Mostly Income"
+  "Job",
+  "Mostly Job"
 )
 fulldf$network<-factor(
   fulldf$network,
@@ -255,31 +260,29 @@ fulldf$network<-factor(
   tmplabels
 )
 
-#explain models
-fulldf$modname <- "f(inferences)"
-fulldf$modname[fulldf$theta_luck==1]<-str_replace(
-  fulldf$modname[fulldf$theta_luck==1],"\\)",",luck)"
+#name models
+fulldf$modname<-"f(ownincome"
+tmp<-(
+  fulldf$theta_class==1 & 
+    fulldf$theta_race==1 & 
+    fulldf$theta_ability==-1
 )
-fulldf$modname[fulldf$theta_descriptive==1]<-str_replace(
-  fulldf$modname[fulldf$theta_descriptive==1],"\\)",",inequality)"
-)
-tmplevels<-c(
-  "f(inferences)",
-  "f(inferences,luck)",
-  "f(inferences,inequality)",
-  "f(inferences,luck,inequality)"
-)
-fulldf$modname <- factor(
-  fulldf$modname,
-  tmplevels
-)
+fulldf$modname[tmp] <- paste0(fulldf$modname[tmp],",coefs")
+tmp<-fulldf$theta_descriptive==1
+fulldf$modname[tmp] <- paste0(fulldf$modname[tmp],",inequality")
+tmp<-fulldf$theta_luck==1
+fulldf$modname[tmp] <- paste0(fulldf$modname[tmp],",luck")
+fulldf$modname <- paste0(fulldf$modname,")")
 
+if(length(table(table(fulldf$modname)))!=1)
+  stop('the naming hasnt worked properly; too many lumped in one')
 
 #########################################################
 #########################################################
 
 #PLOT MEDIAN p(Redistribution)
 plotdf <- fulldf[
+  world=='yesdiscrimination' #plot in n discrimination world
   ,
   .(
     mu=median(phat,na.rm=T)
@@ -305,6 +308,21 @@ plotdf<-plotdf[
   )
   ]
 
+#decide which to include and how to order
+tmplevels<-c(
+  "f(ownincome)",
+  "f(ownincome,coefs)",
+  "f(ownincome,inequality)",
+  "f(ownincome,luck)",
+  "f(ownincome,coefs,inequality,luck)"
+)
+plotdf<-plotdf[plotdf$modname%in%tmplevels,]
+plotdf$modname <- factor(
+  plotdf$modname,
+  rev(tmplevels)
+)
+
+
 g.tmp<-ggplot(
   plotdf,
   aes(
@@ -327,7 +345,8 @@ g.tmp<-ggplot(
     name="Social World"
   ) +
   xlab("") + 
-  ylab("Median Attitude Towards Redistribution\n") +
+  ylab("\nMedian Attitude Towards Redistribution") +
+  coord_flip() + 
   theme_bw() 
 
 tmpname<-"fig_redistribution.pdf"
@@ -335,7 +354,7 @@ gs.list[[tmpname]]<-list(
   graph=g.tmp,
   filename=tmpname,
   width=6*1.5,
-  height=3*1.5
+  height=4*1.5
 )
 output(plotdf,tmpname)
 

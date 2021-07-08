@@ -46,6 +46,10 @@ gs.list<-list()
 #########################################################
 #########################################################
 
+#the indirect effect
+race_indirect <- 0.75 
+#this necessary to roughly equalize race=class=ability
+
 #loop through these
 loopdf<-expand.grid(
   #many worlds
@@ -58,52 +62,49 @@ loopdf<-expand.grid(
   income_dist=c('normal'),
   race_dist=c(0.36), #1 - white, nonhispanics in the USA  
   #betas_stage1
-  beta_race_income=c(1),
+  beta_race_income=c(race_indirect),
   #betas_stage2
   beta_income_nhood=c(1),
-  beta_race_nhood=c(1),
+  beta_race_nhood=c(0,race_indirect/10), #no/yes discrimination
   beta_ability_nhood=c(0),
   #betas_stage3
   beta_income_school=c(0),
-  beta_ability_school=c(0.25),
-  beta_race_school=c(0,0.1), #no/yes discrimination
+  beta_ability_school=c(0.3),
+  beta_race_school=c(0,race_indirect/10), #no/yes discrimination
   beta_nhood_school=c(1),
   #betas_stage4
   beta_income_earnings=c(0),
-  beta_ability_earnings=c(0.25),
-  beta_race_earnings=c(0,0.1), #no/yes discrimination
+  beta_ability_earnings=c(0.3),
+  beta_race_earnings=c(0,race_indirect/10), #no/yes discrimination
   beta_nhood_earnings=c(0),
   beta_school_earnings=c(1),
   #how is network distributed across stages
-  share_random=c(0,1),#),1),#0.1),
-  share_in_nhood=c(0,1),#,1),#0.90),
-  share_in_school=c(0,1),#1),#0.90),
-  share_in_earnings=c(0,1),#1),#0.90),
+  share_random=c(0,1),
+  share_in_nhood=c(0,1),
+  share_in_school=c(0,1),
+  share_in_earnings=c(0,1),
   #how much does luck matter in our world
   luck=c(1),#,0.1)
   #rescale all vars to N(0,1) at every stage?
   rescale = T,
+  #is this main or robustness
+  main = "main",
   stringsAsFactors = F
 )
 
-#get rid of all race permuationts
-#where race_dist is 0
-tmp<-loopdf$race_dist==1 &
-  loopdf$beta_race_income!=0 & 
-  loopdf$beta_race_nhood!=0 & 
-  loopdf$beta_race_school!=0 &
-  loopdf$beta_race_earnings!=0
-loopdf<-loopdf[!tmp,]
-
-#drop the superfluous worlds
-tmp<-(
-  loopdf$beta_race_school==0 & 
-    loopdf$beta_race_earnings!=0
-) |  (
-  loopdf$beta_race_earnings==0 & 
-    loopdf$beta_race_school!=0
+#make discrimination vars vary together
+disc_vars <- c(
+  'beta_race_nhood',
+  'beta_race_school',
+  'beta_race_earnings'
 )
-loopdf<-loopdf[!tmp,]
+tmp<-round(
+  apply(
+  loopdf[,disc_vars],
+  1,
+  sum
+),2)==round(race_indirect*3/10,2) #floating point problem
+loopdf<-loopdf[tmp,]
 
 #get rid of all shares which don't add up to 1
 sharevars<-str_detect(names(loopdf),"share\\_")
@@ -112,11 +113,65 @@ tmp<-apply(
 )==1
 loopdf<-loopdf[tmp,]
 
+#########################################################
+#########################################################
+
+# ROBUSTNESS CHECKS
+robustness<-T
+if(robustness) {
+  
+  #get basic loopdf; decide how many see ds you want
+  robustness_seeds <- ifelse(max(loopdf$seed)==10,5,10)
+  basedf<-loopdf[loopdf$seed%in%c(1:robustness_seeds),]
+  
+  #(1) direct effect >>> indirect effect
+  #(roughly, aiming for 70% direct, 30% indirect)
+  tmpdf<-basedf
+  tmpdf$beta_race_earnings<-
+    tmpdf$beta_race_nhood<-
+    tmpdf$beta_race_school<-race_indirect/6
+  tmpdf$beta_race_income<-race_indirect/4
+  tmpdf$main<-"robustness_directindirect"
+  loopdf<-rbind.fill(
+    loopdf,
+    tmpdf
+  ) 
+  
+  #(2) race effect > class effect; class effect > race effect
+  tmpdf<-basedf
+  mult_factor <- 1.5
+  racevars<-names(tmpdf)[str_detect(names(tmpdf),"beta_race")]
+  classvars<-names(tmpdf)[str_detect(names(tmpdf),"beta_income")]
+  for(v in racevars)
+    tmpdf[[v]]<-mult_factor * tmpdf[[v]] #increase race effect
+  for(v in classvars)
+    tmpdf[[v]]<-tmpdf[[v]] / mult_factor #reduce class effect
+  tmpdf$main<-"robustness_racebigger"
+  loopdf<-rbind.fill(
+    loopdf,
+    tmpdf
+  ) 
+  tmpdf<-basedf
+  for(v in racevars)
+    tmpdf[[v]]<-tmpdf[[v]] / mult_factor 
+  for(v in classvars)
+    tmpdf[[v]]<-mult_factor * tmpdf[[v]] 
+  tmpdf$main<-"robustness_classbigger"
+  loopdf<-rbind.fill(
+    loopdf,
+    tmpdf
+  ) 
+  
+}
+
+#########################################################
+#########################################################
+
 #assign i's
 loopdf$i<-1:nrow(loopdf); print(nrow(loopdf))
 fulloutput<-lapply(loopdf$i,function(i) {
   
-  #i<-11
+  #i<-1
   
   #tracker
   pct_done <- round(i/nrow(loopdf) * 100)
@@ -183,7 +238,6 @@ fulloutput<-lapply(loopdf$i,function(i) {
   #rescale?
   if(thisrow$rescale) 
     agentsdf$nhood_raw <- scale(agentsdf$nhood_raw)
-  
   
   #this gets the nhood proper name
   tmpqs<-seq(0,1,length.out = N_groups + 1) 
@@ -313,17 +367,24 @@ fulloutput<-lapply(loopdf$i,function(i) {
   })
   
   ###fourth, everyone looks at their networks and draws inferences
-  inferencesdf<-lapply(1:thisrow$N_agents,function(j) {
+  ###(we also loop through once extra, and calculate everything unconstrained;
+  ###this gives us God's estimate; ground truth)
+  inferencesdf<-lapply(1:(thisrow$N_agents+1),function(j) {
     
-    #j<-62
+    #j<-1001
     #print(j)
     if( floor(j)%%200 == 0 )
       print( paste0("Agent ", j, " out of ",max(thisrow$N_agents)))
     
     
     #get my social space
-    myfriends <- networks[[j]]
+    if(j<=thisrow$N_agents) {
+      myfriends <- networks[[j]]
+    } else {
+      myfriends <- 1:thisrow$N_agents
+    }
     mydf<-agentsdf[agentsdf$agentid%in%myfriends]
+    
     
     #store dfs
     tmpdfs<-list()
@@ -343,21 +404,11 @@ fulloutput<-lapply(loopdf$i,function(i) {
         (mydf$earnings_f - mean(mydf$earnings_f))^2 %>% sum,
         tapply(mydf$earnings_f,mydf$race_i,function(x) sum((x - mean(x))^2 ) ) %>% sum,
         (unlist(
-            tapply(mydf$earnings_f,mydf$race_i,function(x) rep(mean(x),length(x)) )
-          ) - mean(mydf$earnings_f))^2 %>% sum
+          tapply(mydf$earnings_f,mydf$race_i,function(x) rep(mean(x),length(x)) )
+        ) - mean(mydf$earnings_f))^2 %>% sum
       )
     )
     tmpdfs[['descriptive']]<-tmpdf
-    
-    ggplot(
-      mydf,
-      aes(
-        x=earnings_f,
-        group=race_i,
-        fill=race_i
-      )
-    ) + 
-      geom_density()
     
     
     ###causal inference about inequality of earnings
@@ -465,21 +516,21 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'race'
     tmpdfs[['causal_race']]<-tmpdf
     
-    #discrimination only
-    mdiscrimination <- lm(
+    #discrimination by school and labor market
+    mdiscrimination_slm <- lm(
       data=mydf,
       formula=earnings_f ~ 
         race_i + 
         nhood_raw
     )
-    m.tmp<-mdiscrimination
+    m.tmp<-mdiscrimination_slm
     msum<-summary(m.tmp)
     tmpdf<-data.frame(msum$coefficients)
     names(tmpdf)<-c("mu","se","tval","pval")
     tmpdf$var<-row.names(tmpdf) 
     row.names(tmpdf)<-NULL
     #add any missing rows
-    allvars<-attr(mdiscrimination$terms,'term.labels')
+    allvars<-attr(mdiscrimination_slm$terms,'term.labels')
     if ( sum(!allvars%in%tmpdf$var) > 0) {
       newrow<-data.frame(
         var = allvars[!allvars%in%tmpdf$var]
@@ -489,24 +540,66 @@ fulloutput<-lapply(loopdf$i,function(i) {
     }
     tmpdf<-rbind.fill(tmpdf,newrow)
     tmpdf$agentid<-j
-    tmpdf$model<-'discrimination'
-    tmpdfs[['causal_discrimination']]<-tmpdf
+    tmpdf$model<-'discrimination_slm'
+    tmpdfs[['causal_discrimination_slm']]<-tmpdf
+    
+    #discrimination by labor market only
+    mdiscrimination_lm <- lm(
+      data=mydf,
+      formula=earnings_f ~ 
+        race_i + 
+        school_raw
+    )
+    m.tmp<-mdiscrimination_lm
+    msum<-summary(m.tmp)
+    tmpdf<-data.frame(msum$coefficients)
+    names(tmpdf)<-c("mu","se","tval","pval")
+    tmpdf$var<-row.names(tmpdf) 
+    row.names(tmpdf)<-NULL
+    #add any missing rows
+    allvars<-attr(mdiscrimination_lm$terms,'term.labels')
+    if ( sum(!allvars%in%tmpdf$var) > 0) {
+      newrow<-data.frame(
+        var = allvars[!allvars%in%tmpdf$var]
+      ) 
+    } else {
+      newrow <- NULL
+    }
+    tmpdf<-rbind.fill(tmpdf,newrow)
+    tmpdf$agentid<-j
+    tmpdf$model<-'discrimination_lm'
+    tmpdfs[['causal_discrimination_lm']]<-tmpdf
+    
     
     #get estimates of share explained via 42
     mymods <- list(
       normal = m,
       #quantile = mq,
       race = mrace,
-      discrimination = mdiscrimination
+      discrimination_slm = mdiscrimination_slm,
+      discrimination_lm = mdiscrimination_lm
     )
     tmpdf <- lapply(seq_along(mymods),function(k) {
+      #k<-1
       thism <- mymods[[k]]
       thism_sum <- summary(thism)
+      
+      #get residual sum of squares
+      rss <- sum(resid(thism)^2)
+      #get total sum of squares
+      tss <- sum ( 
+        (thism$model$earnings_f - mean(thism$model$earnings_f))^2 
+      )
+      #get explained some of squares
+      ess <- sum( 
+        (thism$fitted.values - mean(thism$model$earnings_f))^2 
+      )
+    
       data.frame(
         agentid = j,
         model = names(mymods)[k],
-        var = c("r2","adjr2"),
-        mu = c(thism_sum$r.squared,thism_sum$adj.r.squared)
+        var = c("r2","adjr2","rss","ess","tss"), #r2 = 1 - rss/tss, or ess/tss
+        mu = c(thism_sum$r.squared,thism_sum$adj.r.squared,rss,ess,tss)
       )
     }) %>% rbind.fill
     tmpdfs[['variance_explained']]<-tmpdf

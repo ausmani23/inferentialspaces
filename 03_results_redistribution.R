@@ -59,26 +59,6 @@ load(
   '01_run.RData'
 )
 
-#fix loopdf
-loopdf$network<-"random"
-loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
-loopdf$network[loopdf$share_in_nhood==0.90]<- "nhood95"
-loopdf$network[loopdf$share_in_school==1]<-"school"
-loopdf$network[loopdf$share_in_school==0.90]<- "school95"
-loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
-loopdf$network[loopdf$share_in_earnings==0.90]<-"earnings95"
-loopdf$share_in_school<-
-  loopdf$share_in_earnings<-
-  loopdf$share_in_nhood<-
-  loopdf$share_random<-NULL
-loopdf
-
-tmp<-loopdf$beta_race_school==0 & 
-  loopdf$beta_race_earnings==0
-loopdf$world[tmp]<-"nodiscrimination"
-tmp<-loopdf$beta_race_school>0 & loopdf$beta_race_earnings>0
-loopdf$world[tmp]<-"yesdiscrimination"
-
 #########################################################
 #########################################################
 
@@ -106,15 +86,13 @@ loopdf$world[tmp]<-"yesdiscrimination"
 
 #below, standard model is p(redistribution) rises 
 #+ with class coefficent
-#+ with race coefficient 
+#+ with race coefficient (total)
 #- with ability coefficient
 #- with own income
 
 #we explore, optionally
 #+ with descriptive inequality
 #+ with luck/share of variance unexplained
-
-
 
 #########################################################
 #########################################################
@@ -127,12 +105,13 @@ inferencesdf<-lapply(
   rbind.fill %>%
   data.table
 tmpdf<-inferencesdf[
+  agentid<=max(loopdf$N_agents)
   ,
   .(
-    descriptive = mu[model=='inequality'],
-    class = mu[model=='normal' & var=='income_i'],
-    race = mu[model=='normal' & var=='race_i'],
-    ability = mu[model=='normal' & var=='ability_i'],
+    descriptive = mu[model=='inequality'], 
+    class = mu[model=='normal' & var=='income_i'], #total effect of class
+    race = mu[model=='race' & var=='race_i'], #total effect of race
+    ability = mu[model=='normal' & var=='ability_i'], #total effect of ability
     luckest = 1 - mu[model=='normal' & var=='r2']
   )
   ,
@@ -187,7 +166,8 @@ mycoefs <- names(coefsdf)[!names(coefsdf)%in%c('modnum')]
 myvars <- str_replace(mycoefs,"theta\\_","")
 
 ####
-#remove all in which inferences don't vary together
+
+#remove all in which coefs don't vary together
 tmp<-coefsdf$theta_race==coefsdf$theta_class & 
   coefsdf$theta_class==(-1*coefsdf$theta_ability)
 coefsdf<-coefsdf[tmp,]
@@ -217,6 +197,29 @@ phatdf <- lapply(tmpseq.i,function(i) {
     owincome_ptile = ecdf(fulldf$ownincome)(fulldf$ownincome)
   )
 }) %>% rbind.fill %>% data.table
+
+#########################################################
+#########################################################
+
+#fix loopdf
+loopdf$network<-"random"
+loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
+loopdf$network[loopdf$share_in_nhood==0.90]<- "nhood95"
+loopdf$network[loopdf$share_in_school==1]<-"school"
+loopdf$network[loopdf$share_in_school==0.90]<- "school95"
+loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
+loopdf$network[loopdf$share_in_earnings==0.90]<-"earnings95"
+loopdf$share_in_school<-
+  loopdf$share_in_earnings<-
+  loopdf$share_in_nhood<-
+  loopdf$share_random<-NULL
+loopdf
+
+tmp<-loopdf$beta_race_school==0 & 
+  loopdf$beta_race_earnings==0
+loopdf$world[tmp]<-"nodiscrimination"
+tmp<-loopdf$beta_race_school>0 & loopdf$beta_race_earnings>0
+loopdf$world[tmp]<-"yesdiscrimination"
 
 #merge
 fulldf <- merge(
@@ -251,8 +254,8 @@ tmplabels<-c(
   "Mostly Neighborhood",
   "School",
   "Mostly School",
-  "Job",
-  "Mostly Job"
+  "Workplace",
+  "Mostly Workplace"
 )
 fulldf$network<-factor(
   fulldf$network,
@@ -282,6 +285,7 @@ if(length(table(table(fulldf$modname)))!=1)
 
 #PLOT MEDIAN p(Redistribution)
 plotdf <- fulldf[
+  main=='main' & 
   world=='yesdiscrimination' #plot in n discrimination world
   ,
   .(
@@ -322,6 +326,13 @@ plotdf$modname <- factor(
   rev(tmplevels)
 )
 
+tmpcolors<-c(
+  'Ground Truth'='grey',
+  'Integrated'='#e41a1c',
+  'Neighborhood'='#377eb8',
+  'School'='#4daf4a',
+  'Workplace'='#984ea3'
+)
 
 g.tmp<-ggplot(
   plotdf,
@@ -341,52 +352,30 @@ g.tmp<-ggplot(
     size=1.25,
     position=position_dodge(0.4)
   ) +
-  scale_color_discrete(
-    name="Social World"
+  scale_color_manual(
+    name="Social World",
+    values=tmpcolors
   ) +
   xlab("") + 
   ylab("\nMedian Attitude Towards Redistribution") +
-  coord_flip() + 
-  theme_bw() 
+  coord_flip() +
+  theme_bw() +
+  theme(
+    legend.position='top',
+    legend.direction='horizontal'
+  )
 
+setwd(outputdir)
 tmpname<-"fig_redistribution.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
+ggsave(
+  plot=g.tmp,
   filename=tmpname,
-  width=6*1.5,
-  height=4*1.5
+  width=6*1.25,
+  height=4*1.25
 )
 output(plotdf,tmpname)
 
 
 #########################################################
 #########################################################
-
-
-#OUTPUT
-#output graphlist
-setwd(outputdir)
-this.sequence<-seq_along(gs.list)
-for(i in this.sequence) {
-  print(
-    paste0(
-      "saving ",i," of ",length(this.sequence)
-    )
-  )
-  thiselement<-gs.list[[i]]
-  ggsave(
-    filename=thiselement$filename,
-    plot=thiselement$graph,
-    width=thiselement$width,
-    height=thiselement$height
-  )
-  Sys.sleep(0.5)
-}
-
-
-
-
-
-
-
 

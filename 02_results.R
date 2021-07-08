@@ -59,6 +59,87 @@ load(
   '01_run.RData'
 )
 
+#retrieve inferences, 
+infdf<-lapply(
+  fulloutput,
+  function(x) x$inferencesdf
+) %>% 
+  rbind.fill %>%
+  data.table
+rm(fulloutput) #don't keep this in memory
+
+#use the N+1'th agent as baseline
+  infdf$se<-
+  infdf$tval<-
+  infdf$pval<-
+  # infdf$mu.min<-
+  # infdf$mu.max<-
+  # infdf$pval.class<-
+  NULL
+
+
+#set N+1th agent to be the baseline
+infdf<-dcast.data.table(
+  infdf,
+  i + model + var ~ agentid,
+  value.var='mu'
+)
+tmp<-names(infdf)==unique(loopdf$N_agents+1)
+names(infdf)[tmp]<-"baseline"
+gathcols<-1:max(loopdf$N_agents) %>% as.character
+infdf<-melt.data.table(
+  infdf,
+  variable.name="agentid",
+  value.name="mu",
+  measure.vars=gathcols
+) %>% data.table
+infdf$mu_bias<- infdf$mu - infdf$baseline
+#infdf$baseline<-NULL
+
+
+#fix vars
+infdf$var %>% unique
+infdf$oldvar<-infdf$var
+tmplevels<-c(
+  '(Intercept)',
+  'race_i',
+  'income_i',
+  'ability_i',
+  ####
+  "adjr2",
+  "r2",
+  'tss',
+  'rss',
+  'ess',
+  "nhood_raw",
+  "school_raw",
+  "logvar"
+  
+)
+tmplabels<-c(
+  "Intercept",
+  "Race",
+  "Class",
+  "Ability",
+  ####
+  "Luck (Adj.)",
+  "Luck",
+  'Total SS',
+  'Residual SS',
+  'Estimated SS',
+  "Neighborhood",
+  "School",
+  "Inequality"
+)
+infdf$var<-factor(
+  infdf$var,
+  tmplevels,
+  tmplabels
+)
+
+#########################################################
+#########################################################
+
 #fix loopdf
 loopdf$network<-"random"
 loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
@@ -74,50 +155,22 @@ loopdf$share_in_school<-
 loopdf
 
 tmp<-loopdf$beta_race_school==0 & 
-  loopdf$beta_race_earnings==0
+  loopdf$beta_race_earnings==0 & 
+  loopdf$beta_race_nhood==0
 loopdf$world[tmp]<-"nodiscrimination"
-tmp<-loopdf$beta_race_school>0 & loopdf$beta_race_earnings>0
+tmp<-loopdf$beta_race_school>0 & 
+  loopdf$beta_race_earnings>0 &
+  loopdf$beta_race_nhood>0
 loopdf$world[tmp]<-"yesdiscrimination"
 
-#retrieve inferences, 
-inferencesdf<-lapply(
-  fulloutput,
-  function(x) x$inferencesdf
-) %>% 
-  rbind.fill %>%
-  data.table
-inferencesdf<-merge(
-  loopdf,
-  inferencesdf
-) %>% data.table
+#add extra information, from loopdf
+infdf<-merge.data.table(
+  data.table(loopdf),
+  infdf
+) 
+infdf[,i:=NULL] #not necessary, post merge
 
-#use random as baseline
-inferencesdf$i<-
-inferencesdf$se<-
-  inferencesdf$tval<-
-  inferencesdf$pval<-
-  # inferencesdf$mu.min<-
-  # inferencesdf$mu.max<-
-  # inferencesdf$pval.class<-
-  NULL
-biasdf<-spread(
-  inferencesdf,
-  network,
-  mu
-)
-biasdf$baseline<-biasdf$random
-gathcols<-unique(loopdf$network)
-#gathcols<-gathcols[gathcols!="random"]
-biasdf<-gather_(
-  biasdf,
-  "group",
-  "mu",
-  gathcols
-) %>% data.table
-biasdf$mu_bias<- biasdf$mu - biasdf$baseline
-biasdf$baseline<-NULL
-
-#fix groups
+#fix groups 
 tmplevels<-c(
   "random",
   "nhood",
@@ -133,369 +186,163 @@ tmplabels<-c(
   "Mostly Neighborhood",
   "School",
   "Mostly School",
-  "Job",
-  "Mostly Job"
+  "Workplace",
+  "Mostly Workplace"
 )
-biasdf$group<-factor(
-  biasdf$group,
+infdf$group<-factor(
+  infdf$network,
   tmplevels,
   tmplabels
 )
-
-#fix vars
-biasdf$var %>% unique
-biasdf$oldvar<-biasdf$var
-tmplevels<-c(
-  '(Intercept)',
-  'race_i',
-  'income_i',
-  'ability_i',
-  ####
-  "adjr2",
-  "r2",
-  "nhood_raw",
-  "logvar"
-
-)
-tmplabels<-c(
-  "Intercept",
-  "Race",
-  "Class",
-  "Ability",
-  ####
-  "Luck (Adj.)",
-  "Luck",
-  "Neighborhood",
-  "Inequality"
-)
-biasdf$var<-factor(
-  biasdf$var,
-  tmplevels,
-  tmplabels
-)
+infdf[,network:=NULL] #rename
 
 #########################################################
 #########################################################
 
-# #(1)
-# #SHOW THAT CAUSAL INFERENCES ABOUT RACE AND INCOME SUFFER
-# #whether sampling on nhood, school or income, 
-# #these inferences suffer
-# 
-# #(2) 
-# #SHOW THAT CAUSAL INFERENCES ABOUT ABILITY SUFFER DIFFERENTLY
-# #neighborhood samplers see ability just fine
-# #school samplers only see a little of it
-# #income samplers see none of it
-# 
-# plotdf<-biasdf[
-#   model=="normal" & 
-#     luck==1 & 
-#     var%in%c('Class','Race','Ability')  &
-#     group!="Random" &
-#     world=="nodiscrimination"
-#   ]
-# 
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu_bias=median(mu_bias,na.rm=T)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var',
-#     'seed'
-#   )
-#   ]
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=quantile(mu_bias,0.5),
-#     mu.min=quantile(mu_bias,0.025),
-#     mu.max=quantile(mu_bias,0.975)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var'
-#   )
-#   ]
-# 
-# g.tmp<-ggplot(
-#   plotdf,
-#   aes(
-#     x=var,
-#     y=mu,
-#     ymin=mu.min,
-#     ymax=mu.max,
-#     group=group,
-#     color=group
-#   )
-# ) +
-#   geom_point(
-#     position=position_dodge(0.4)
-#   ) +
-#   geom_linerange(
-#     position=position_dodge(0.4)
-#   ) +
-#   scale_color_discrete(
-#     name="Social World"
-#   ) +
-#   coord_flip() +
-#   theme_bw() +
-#   ylab("\nBias") +
-#   xlab("") 
-# 
-# # tmpname<-"fig_inferences_bias.pdf"
-# # gs.list[[tmpname]]<-list(
-# #   graph=g.tmp,
-# #   filename=tmpname,
-# #   width=4*1.5,
-# #   height=3*1.5
-# # )
-# # output(plotdf,tmpname)
-# 
-# 
-# #(3) PLOT ACTUAL COEFFICIENTS
-# 
-# plotdf<-biasdf[
-#   model=="normal" & 
-#     var%in%c('Class','Race','Ability') &
-#     world=='nodiscrimination'
-#   ]
-# 
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=median(mu,na.rm=T)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var',
-#     'seed'
-#   )
-#   ]
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=quantile(mu,0.5),
-#     mu.min=quantile(mu,0.025),
-#     mu.max=quantile(mu,0.975)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var'
-#   )
-#   ]
-# 
-# g.tmp<-ggplot(
-#   plotdf,
-#   aes(
-#     x=var,
-#     y=mu,
-#     ymin=mu.min,
-#     ymax=mu.max,
-#     group=group,
-#     color=group
-#   )
-# ) +
-#   geom_point(
-#     size=2,
-#     position=position_dodge(0.4)
-#   ) +
-#   geom_linerange(
-#     size=1.25,
-#     position=position_dodge(0.4)
-#   ) +
-#   geom_line(
-#     alpha=0.25,
-#     size=2,
-#     position=position_dodge(0.4)
-#   ) +
-#   scale_color_discrete(
-#     name="Social World"
-#   ) +
-#   coord_flip() +
-#   theme_bw() +
-#   ylab("\nEstimated Effect on Earnings") +
-#   xlab("") 
+### STATS
 
-# tmpname<-"fig_inferences.pdf"
-# gs.list[[tmpname]]<-list(
-#   graph=g.tmp,
-#   filename=tmpname,
-#   width=4*1.5,
-#   height=3*1.5
-# )
-# output(plotdf,tmpname)
+### is race = class = ability, roughly? 
+
+tmpdf1<-infdf[
+  model=="normal" & 
+    var%in%c('Class','Ability') & #total effects of class,a bility
+    world=='yesdiscrimination' &
+    main=="main"
+]
+tmpdf2<-infdf[
+  model%in%c('race') & #total effect of race
+    var=='Race' &
+    world=='yesdiscrimination' & 
+    main=="main"
+]
+tmpdf<-rbind.fill(tmpdf1,tmpdf2) %>% data.table
+tmpdf<-tmpdf[
+  ,
+  .(
+    mu = median(baseline,na.rm=T)
+  )
+  ,
+  by=c(
+    'oldvar',
+    'seed'
+  )
+]
+tmpdf<-spread(tmpdf,oldvar,mu)
+
+tmpdf$class_ability <- tmpdf$income_i - tmpdf$ability_i
+tmpdf$class_race <- tmpdf$income_i - tmpdf$race_i
+tmpdf$race_ability <- tmpdf$race_i - tmpdf$ability_i
+
+#i want these all to be close to zero, roughly
+median(tmpdf$class_ability) 
+median(tmpdf$class_race) 
+median(tmpdf$race_ability) 
+#pretty well-calibrated! 
+
+### direct > indirect
+
+tmpdf<-infdf[
+  model%in%c('race','normal') & #total effect of race
+    var=='Race' &
+    world=='yesdiscrimination' & 
+    main%in%c("main")
+]
+tmpdf<-tmpdf[
+  ,
+  .(
+    mu = median(baseline,na.rm=T)
+  )
+  ,
+  by=c(
+    'oldvar',
+    'seed',
+    'model',
+    'main'
+  )
+]
+tmpdf<-spread(tmpdf,model,mu)
+
+#centered roughly where we want.. 
+quantile(tmpdf$normal/tmpdf$race,c(0.025,0.5,0.975)) #pretty good
+
+### direct vs. indirect robustness test
+#we want race = class = ability to still be roughly true
+#but we want the ratio of direct/indirect to have changed.. 
+
+tmpdf1<-infdf[
+  model=="normal" & 
+    var%in%c('Class','Ability','Race') & #total effects of class,a bility
+    world=='yesdiscrimination' &
+    main=="robustness_directindirect"
+]
+tmpdf2<-infdf[
+  model%in%c('race') & #total effect of race
+    var=='Race' &
+    world=='yesdiscrimination' & 
+    main=="robustness_directindirect"
+]
+tmpdf<-rbind.fill(tmpdf1,tmpdf2) %>% data.table
+tmpdf$varmodel<-paste0(tolower(tmpdf$var),"_",tmpdf$model)
+tmpdf<-tmpdf[
+  ,
+  .(
+    mu = median(baseline,na.rm=T)
+  )
+  ,
+  by=c(
+    'varmodel',
+    'seed'
+  )
+]
+tmpdf<-spread(tmpdf,varmodel,mu)
+
+#direct indirect
+quantile(tmpdf$race_normal/tmpdf$race_race,c(0.025,0.5,0.975)) #perfect
+
+#race = class = ability?
+tmpdf$class_ability <- tmpdf$class_normal - tmpdf$ability_normal
+tmpdf$class_race <- tmpdf$class_normal - tmpdf$race_race
+tmpdf$race_ability <- tmpdf$race_race - tmpdf$ability_normal
+
+#i want these all to be close to zero, roughly
+median(tmpdf$class_ability) 
+median(tmpdf$class_race) 
+median(tmpdf$race_ability) 
+#race < smaller than the rest, 
+#but this is just robustness
+#no big deal.. 
 
 #########################################################
 #########################################################
 
-#(3) PLOT LUCK; HOW MUCH CAN'T THE ESTIMATES EXPLAIN?
+### PLOTS
 
-# plotdf <- biasdf[
-#   oldvar%in%c("r2") &
-#     world=='nodiscrimination' &
-#     model=="normal",
-#   .(
-#     mu = 1 - median(mu)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'oldvar',
-#     'seed'
-#   )
-#   ]
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=quantile(mu,0.5),
-#     mu.min=quantile(mu,0.025),
-#     mu.max=quantile(mu,0.975)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'oldvar'
-#   )
-#   ]
-# 
-# g.tmp <- ggplot(
-#   plotdf,
-#   aes(
-#     x=group,
-#     y=mu,
-#     ymin=mu.min,
-#     ymax=mu.max,
-#     color=group
-#   )
-# ) +
-#   geom_point(
-#     size=2,
-#     position=position_dodge(0.4)
-#   ) +
-#   geom_linerange(
-#     size=1.25,
-#     position=position_dodge(0.4)
-#   ) +
-#   scale_color_discrete(
-#     name="Social World"
-#   ) +
-#   coord_flip() +
-#   xlab("") + 
-#   ylab("\nLuck (i.e. 1 - R^2)") +
-#   theme_bw()
-# 
-# tmpname<-"fig_luck.pdf"
-# gs.list[[tmpname]]<-list(
-#   graph=g.tmp,
-#   filename=tmpname,
-#   width=4*1.5,
-#   height=3*1.5
-# )
-# output(plotdf,tmpname)
+## DESCRIPTIVE AND CAUSAL INFERENCES 
+# plot all descriptive and causl infererence about inequality
 
-#########################################################
-#########################################################
-
-#(4) INFERENCES ABOUT INEQUALITY
-
-# plotdf<-biasdf[
-#   model=='inequality' &
-#     world=='nodiscrimination'
-#   ]
-# 
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=median(mu,na.rm=T)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var',
-#     'seed'
-#   )
-#   ]
-# plotdf<-plotdf[
-#   ,
-#   .(
-#     mu=quantile(mu,0.5),
-#     mu.min=quantile(mu,0.025),
-#     mu.max=quantile(mu,0.975)
-#   )
-#   ,
-#   by=c(
-#     'group',
-#     'var'
-#   )
-#   ]
-# 
-# g.tmp<-ggplot(
-#   plotdf,
-#   aes(
-#     x=group,
-#     y=mu,
-#     ymin=mu.min,
-#     ymax=mu.max,
-#     color=group
-#   )
-# ) +
-#   geom_point(
-#     size=2,
-#     position=position_dodge(0.4)
-#   ) +
-#   geom_linerange(
-#     size=1.25,
-#     position=position_dodge(0.4)
-#   ) +
-#   scale_color_discrete(
-#     guide=F
-#   ) +
-#   coord_flip() +
-#   xlab("") + 
-#   ylab("\nObserved Inequality in Final Income") +
-#   theme_bw()
-
-# tmpname<-"fig_inequality.pdf"
-# gs.list[[tmpname]]<-list(
-#   graph=g.tmp,
-#   filename=tmpname,
-#   width=4*1.5,
-#   height=3*1.5
-# )
-# output(plotdf,tmpname)
-
-#########################################################
-#########################################################
-
-#PLOT ALL INFERENCES TOGETHER
-#(replaces all figs above)
-
-tmpdf1<-biasdf[
+tmpdf1<-infdf[
   model=="normal" & 
     var%in%c('Class','Race','Ability') &
-    world=='nodiscrimination'
-  ]
+    world=='yesdiscrimination' &
+    main=="main" #not robustness 
+]
 tmpdf1$inference<-c("Causal (Coefficients)")
-tmpdf2<-biasdf[
+tmpdf2<-infdf[
   model=='inequality' &
-    world=='nodiscrimination'
-  ]
+    world=='yesdiscrimination' &
+    main=="main"
+]
 tmpdf2$var<-c("Inequality")
 tmpdf2$inference<-c("Descriptive")
 
-tmpdf3<-biasdf[
-    oldvar%in%c("r2") & 
-      world=="nodiscrimination" & 
-      model=="normal"
+tmpdf3<-infdf[
+  oldvar%in%c("r2") & 
+    world=="yesdiscrimination" & 
+    model=="normal" &
+    main=="main"
 ]
-tmpdf3$mu <- 1 - tmpdf3$mu
+#put in terms of luck, not r2
+tmpdf3$mu <- 1 - tmpdf3$mu; tmpdf3$baseline <- 1 - tmpdf3$baseline 
 tmpdf3$var<-c("Luck")
 tmpdf3$inference<-c("Causal (Luck)")
 
@@ -517,7 +364,7 @@ plotdf<-plotdf[
     'var',
     'seed'
   )
-  ]
+]
 plotdf<-plotdf[
   ,
   .(
@@ -531,14 +378,72 @@ plotdf<-plotdf[
     'group',
     'var'
   )
-  ]
+]
+plotdf$extra<-F
 
+extradf<-rbind.fill(
+  tmpdf1,
+  tmpdf2,
+  tmpdf3
+) %>% data.table
+
+extradf<-extradf[
+  group=='Integrated' #arbitrary group
+  ,
+  .(
+    mu=quantile(baseline,0.5),
+    mu.min=quantile(baseline,0.025),
+    mu.max=quantile(baseline,0.975)
+  )
+  ,
+  by=c(
+    'inference',
+    'var'
+  )
+]
+extradf$group <- 'Ground Truth'
+extradf$extra <- T
+
+#put these together
+plotdf<-rbind.fill(
+  plotdf,
+  extradf
+) %>% data.table
+
+#sort levels/colors/etc.
 tmplevels <- c(
   "Descriptive",
   "Causal (Coefficients)",
   "Causal (Luck)"
 )
+plotdf$inference<-factor(
+  plotdf$inference,
+  tmplevels
+)
 
+tmplevels<-c(
+  "Ground Truth",
+  "Integrated",
+  "Neighborhood",
+  "School",
+  "Workplace"
+)
+plotdf$group<-factor(
+  plotdf$group,
+  tmplevels
+)
+tmpcolors<-c(
+  'grey',
+  '#e41a1c',
+  '#377eb8',
+  '#4daf4a',
+  '#984ea3'
+)
+names(tmpcolors)<-tmplevels
+
+tmpshapes<-c(16,4)
+#tmpalphas<-c(1,0.9)
+names(tmpshapes)<-c(F,T)#names(tmpalphas)<-c(F,T)
 
 g.tmp <- ggplot(
   plotdf,
@@ -547,7 +452,9 @@ g.tmp <- ggplot(
     y=mu,
     ymin=mu.min,
     ymax=mu.max,
-    color=group
+    color=group#,
+    #shape=extra#,
+    #alpha=extra
   )
 ) +
   geom_point(
@@ -558,8 +465,17 @@ g.tmp <- ggplot(
     size=1.25,
     position=position_dodge(0.4)
   ) +
-  scale_color_discrete(
-    name="Social World"
+  scale_color_manual(
+    name="",#,Social World",
+    values=tmpcolors
+  ) +
+  # scale_alpha_manual(
+  #   guide=F,
+  #   values=tmpalphas
+  # ) +
+  scale_shape_manual(
+    guide=F,
+    values=tmpshapes
   ) +
   coord_flip() +
   xlab("") + 
@@ -569,19 +485,26 @@ g.tmp <- ggplot(
   #   ncol=1,
   #   scales='free'
   # ) +
-  theme_bw()
+  theme_bw() +
+  theme(
+    legend.position='top',
+    legend.direction='horizontal'
+  )
+
 g.tmp <- g.tmp + ggforce::facet_col(
   vars(inference), 
   scales='free',
   space='free'
 )
 
+
 tmpname<-"fig_inferences.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
+setwd(outputdir)
+ggsave(
+  plot=g.tmp,
   filename=tmpname,
   width=4*1.5,
-  height=5*1.5
+  height=6*1.5
 )
 output(plotdf,tmpname)
 
@@ -589,23 +512,37 @@ output(plotdf,tmpname)
 #########################################################
 #########################################################
 
-#(5) #RACIAL INEQUALITY
-#people make all sorts of mistake about racial inequality
+## RACIAL INEQUALITY
+# people make all sorts of mistake about racial inequality
 
 tmpdfs<-list()
-#(1) constrianed estimators will underestimate the overall racial gap
-#(above we show conditional racial gap; here we want to show overall)
-#(2) constrained estimators will attribute a larger share 
-#of the racial gap they see to discrimination
-#(3) constrianed estimators will 
 
 #RACIAL GAP + DISCRIMINATION
-tmpdf<-biasdf[
-  (model%in%c('race','discrimination') &
+tmpdf<-infdf[
+  model%in%c('race','normal') & #normal gives direct effect of race
     var=='Race' &
-    world=='yesdiscrimination') 
-  ]
-tmpdf$mu_bias<-NULL
+    world=='yesdiscrimination' &
+    main=="main"
+]
+tmpdf$mu_bias<-tmpdf$baseline<-NULL
+
+#add ground truth
+tmpdf2<-infdf[
+  (model%in%c('race','normal') &
+     var=='Race' & 
+     world=='yesdiscrimination' &
+     group=='Integrated') &
+    main=="main"
+]
+tmpdf2$mu<-tmpdf2$baseline
+tmpdf2$group<-'Ground Truth'
+tmpdf2$mu_bias<-tmpdf2$baseline<-NULL
+
+tmpdf<-rbind.fill(
+  tmpdf,
+  tmpdf2
+) %>% data.table
+
 tmpdf<-spread(
   tmpdf,
   model,
@@ -613,15 +550,18 @@ tmpdf<-spread(
 )
 
 #what fraction of the racial gap is attributed to discrimination? 
-tmpdf$pct_discrimination <- 100 * tmpdf$discrimination/tmpdf$race
+tmpdf$pct_discrimination <- 100 * tmpdf$normal/tmpdf$race
 tmpdf$racialgap <-
   tmpdf$race
+tmpdf$discrimination <- 
+  tmpdf$normal
 #median pct_discimrination and racial gapin a given world
 tmpdf <- tmpdf[
   ,
   .(
     pct_discrimination = median(pct_discrimination,na.rm=T),
-    racialgap = median(racialgap,na.rm=T)
+    racialgap = median(racialgap,na.rm=T),
+    discrimination = median(discrimination)
   )
   ,
   by=c(
@@ -633,18 +573,33 @@ tmpdf <- gather(
   tmpdf,
   stat,
   mu,
-  pct_discrimination:racialgap
+  pct_discrimination:discrimination
 ) %>% data.table
 
 #store
 tmpdfs[['racialgap+discrimination']]<-tmpdf
 
 #calculate within-minority inequality
-tmpdf<-biasdf[
+tmpdf<-infdf[
   model%in%c('betweenss','totalss') & 
     world=='yesdiscrimination'
 ]
-tmpdf$mu_bias<-NULL
+tmpdf$mu_bias<-tmpdf$baseline<-NULL
+#add ground truth
+tmpdf2<-infdf[
+  model%in%c('betweenss','totalss') & 
+    world=='yesdiscrimination' &
+    group=='Integrated'
+]
+tmpdf2$mu<-tmpdf2$baseline
+tmpdf2$group<-'Ground Truth'
+tmpdf2$mu_bias<-tmpdf2$baseline<-NULL
+
+tmpdf<-rbind.fill(
+  tmpdf,
+  tmpdf2
+) %>% data.table
+
 tmpdf<-spread(
   tmpdf,
   model,
@@ -688,23 +643,45 @@ plotdf<-tmpdf[
     'group',
     'stat'
   )
-  ]
+]
 
 tmplevels<-c(
   "racialgap",
-  "betweenshare",
-  "pct_discrimination"
+  "discrimination",
+  "pct_discrimination",
+  "betweenshare"
 )
 tmplabels<-c(
   "Total Racial Gap",
-  "Between-Race Inequality as % of Total",
-  "% of Gap Due to Present-Day Discrimination"
+  "Present-Day Discrimination",
+  "% of Gap Due to Present-Day Discrimination",
+  "Between-Race Inequality as % of Total"
 )
 plotdf$stat <- factor(
   plotdf$stat,
   tmplevels,
   tmplabels
 )
+
+tmplevels<-c(
+  "Ground Truth",
+  "Integrated",
+  "Neighborhood",
+  "School",
+  "Workplace"
+)
+plotdf$group<-factor(
+  plotdf$group,
+  tmplevels
+)
+tmpcolors<-c(
+  'grey',
+  '#e41a1c',
+  '#377eb8',
+  '#4daf4a',
+  '#984ea3'
+)
+names(tmpcolors)<-tmplevels
 
 g.tmp<-ggplot(
   plotdf,
@@ -725,8 +702,9 @@ g.tmp<-ggplot(
     size=1.25,
     position=position_dodge(0.4)
   ) +
-  scale_color_discrete(
-    guide=F
+  scale_color_manual(
+    guide=F,
+    values=tmpcolors
   ) +
   coord_flip() +
   facet_wrap(
@@ -738,9 +716,10 @@ g.tmp<-ggplot(
   xlab("") +
   theme_bw() 
 
+setwd(outputdir)
 tmpname<-"fig_race.pdf"
-gs.list[[tmpname]]<-list(
-  graph=g.tmp,
+ggsave(
+  plot=g.tmp,
   filename=tmpname,
   width=4.5*1.5,
   height=4.5*1.5
@@ -750,23 +729,177 @@ output(plotdf,tmpname)
 #########################################################
 #########################################################
 
-#OUTPUT
-#output graphlist
-setwd(outputdir)
-this.sequence<-seq_along(gs.list)
-for(i in this.sequence) {
-  print(
-    paste0(
-      "saving ",i," of ",length(this.sequence)
+##ROBUSTNESS TO DIFFERENT ASSUMPTIONS
+
+#we want to show that the same conclusions hold
+#whether we live in a direct effect dominated world
+#whether we live in a race-first/class-first world
+
+tmpdf<-infdf[
+  (model%in%c('race','normal') & #normal gives direct effect of race
+     var=='Race' &
+     world=='yesdiscrimination')
+]
+tmpdf$mu_bias<-tmpdf$baseline<-NULL
+
+tmpdf2<-infdf[
+  (model%in%c('race','normal') &
+     var=='Race' & 
+     world=='yesdiscrimination' &
+     group=='Integrated')
+]
+tmpdf2$mu<-tmpdf2$baseline
+tmpdf2$group<-'Ground Truth'
+tmpdf2$mu_bias<-tmpdf2$baseline<-NULL
+
+tmpdf<-rbind.fill(
+  tmpdf,
+  tmpdf2
+) %>% data.table
+
+tmpdf<-spread(
+  tmpdf,
+  model,
+  mu
+)
+#what fraction of the racial gap is attributed to discrimination? 
+tmpdf$pct_discrimination <- 100 * tmpdf$normal/tmpdf$race
+tmpdf$discrimination <- tmpdf$normal
+#median pct_discimrination and racial gapin a given world
+tmpdf <- tmpdf[
+  ,
+  .(
+    pct_discrimination = median(pct_discrimination,na.rm=T),
+    discrimination = median(discrimination),
+    racialgap = median(race)
+  )
+  ,
+  by=c(
+    'main',
+    'group',
+    'seed'
+  )
+]
+tmpdf <- gather(
+  tmpdf,
+  stat,
+  mu,
+  pct_discrimination:racialgap
+) %>% data.table
+
+plotdf<-tmpdf[
+  ,
+  .(
+    mu=quantile(mu,0.5,na.rm=T),
+    mu.min=quantile(mu,0.025,na.rm=T),
+    mu.max=quantile(mu,0.975,na.rm=T)
+  )
+  ,
+  by=c(
+    'main',
+    'group',
+    'stat'
+  )
+]
+
+
+tmplevels<-c(
+  "racialgap",
+  "discrimination",
+  "pct_discrimination",
+  "betweenshare"
+)
+tmplabels<-c(
+  "Total Racial Gap",
+  "Discrimination",
+  "% of Gap Due to Discrimination",
+  "Between-Race Inequality as % of Total"
+)
+plotdf$stat <- factor(
+  plotdf$stat,
+  tmplevels,
+  tmplabels
+)
+
+tmplevels<-c( 
+  'main',
+  'robustness_directindirect',
+  'robustness_classbigger',
+  'robustness_racebigger'
+)
+tmplabels<-c(
+  "Default",
+  "If Direct > Indirect",
+  "If Class > Race",
+  "If Race > Class"
+)
+plotdf$main<-factor(
+  plotdf$main,
+  tmplevels,
+  tmplabels
+)
+
+#same color scheme as above
+tmpcolors<-tmpcolors
+
+g.tmp<-ggplot(
+  plotdf[group!='Ground Truth'],
+  aes(
+    x=group,
+    y=mu,
+    ymin=mu.min,
+    ymax=mu.max,
+    group=group,
+    color=group
+  )
+) +
+  geom_point(
+    size=2,
+    position=position_dodge(0.4)
+  ) +
+  geom_linerange(
+    size=1.25,
+    position=position_dodge(0.4)
+  ) +
+  geom_hline(
+    data=plotdf[group=='Ground Truth'],
+    aes(
+      yintercept=mu
     )
-  )
-  thiselement<-gs.list[[i]]
-  ggsave(
-    filename=thiselement$filename,
-    plot=thiselement$graph,
-    width=thiselement$width,
-    height=thiselement$height
-  )
-  Sys.sleep(0.5)
-}
+    ,
+    linetype='dashed',
+    color='black'
+  ) +
+  scale_color_manual(
+    guide=F,
+    values=tmpcolors
+  ) +
+  coord_flip() +
+  facet_grid(
+    main ~ stat,
+    scales='free'
+  ) +
+  ylab("") +
+  xlab("") +
+  theme_bw() 
+
+setwd(outputdir)
+tmpname<-"fig_race_robustness.pdf"
+ggsave(
+  plot=g.tmp,
+  filename=tmpname,
+  width=6*1.5,
+  height=4.5*1.5
+)
+output(plotdf,tmpname)
+
+
+
+
+
+
+
+
+
+
 

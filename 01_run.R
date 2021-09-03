@@ -53,7 +53,7 @@ race_indirect <- 0.75
 #loop through these
 loopdf<-expand.grid(
   #many worlds
-  seed=1:100,
+  seed=1:10,
   #number of agents
   N_agents=1000,
   #network size
@@ -442,22 +442,22 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'normal'
     tmpdfs[['causal_normal']]<-tmpdf
     
-    #save the relaimpo inferences, separately
-    #relaimpo doesn't run when a var (i.e. race) cant be estimated
-    #so we have to drop the vars which yield NA inferences
-    relimp_vars <- tmpdf$var[!is.na(tmpdf$mu) & tmpdf$var!="(Intercept)"]
-    m.relimp <- calc.relimp(
-      object=mydf$earnings_f,
-      x = mydf[,relimp_vars,with=F]
-    )
-    tmpdf <- data.frame(
-      mu = c(1 - m.relimp@R2,m.relimp@lmg),
-      var = c("luck",names(m.relimp@lmg)),
-      agentid = j,
-      model = 'normal_relimp'
-    )
-    row.names(tmpdf)<-NULL
-    tmpdfs[['causal_normal_relimp']] <- tmpdf
+    # #save the relaimpo inferences, separately
+    # #relaimpo doesn't run when a var (i.e. race) cant be estimated
+    # #so we have to drop the vars which yield NA inferences
+    # relimp_vars <- tmpdf$var[!is.na(tmpdf$mu) & tmpdf$var!="(Intercept)"]
+    # m.relimp <- calc.relimp(
+    #   object=mydf$earnings_f,
+    #   x = mydf[,relimp_vars,with=F]
+    # )
+    # tmpdf <- data.frame(
+    #   mu = c(1 - m.relimp@R2,m.relimp@lmg),
+    #   var = c("luck",names(m.relimp@lmg)),
+    #   agentid = j,
+    #   model = 'normal_relimp'
+    # )
+    # row.names(tmpdf)<-NULL
+    # tmpdfs[['causal_normal_relimp']] <- tmpdf
     
     #DEPRECATED
     # #quantile model
@@ -516,68 +516,68 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'race'
     tmpdfs[['causal_race']]<-tmpdf
     
-    #discrimination by school and labor market
-    mdiscrimination_slm <- lm(
-      data=mydf,
-      formula=earnings_f ~ 
-        race_i + 
-        nhood_raw
-    )
-    m.tmp<-mdiscrimination_slm
-    msum<-summary(m.tmp)
-    tmpdf<-data.frame(msum$coefficients)
-    names(tmpdf)<-c("mu","se","tval","pval")
-    tmpdf$var<-row.names(tmpdf) 
-    row.names(tmpdf)<-NULL
-    #add any missing rows
-    allvars<-attr(mdiscrimination_slm$terms,'term.labels')
-    if ( sum(!allvars%in%tmpdf$var) > 0) {
-      newrow<-data.frame(
-        var = allvars[!allvars%in%tmpdf$var]
-      ) 
-    } else {
-      newrow <- NULL
-    }
-    tmpdf<-rbind.fill(tmpdf,newrow)
-    tmpdf$agentid<-j
-    tmpdf$model<-'discrimination_slm'
-    tmpdfs[['causal_discrimination_slm']]<-tmpdf
-    
-    #discrimination by labor market only
-    mdiscrimination_lm <- lm(
-      data=mydf,
-      formula=earnings_f ~ 
-        race_i + 
-        school_raw
-    )
-    m.tmp<-mdiscrimination_lm
-    msum<-summary(m.tmp)
-    tmpdf<-data.frame(msum$coefficients)
-    names(tmpdf)<-c("mu","se","tval","pval")
-    tmpdf$var<-row.names(tmpdf) 
-    row.names(tmpdf)<-NULL
-    #add any missing rows
-    allvars<-attr(mdiscrimination_lm$terms,'term.labels')
-    if ( sum(!allvars%in%tmpdf$var) > 0) {
-      newrow<-data.frame(
-        var = allvars[!allvars%in%tmpdf$var]
-      ) 
-    } else {
-      newrow <- NULL
-    }
-    tmpdf<-rbind.fill(tmpdf,newrow)
-    tmpdf$agentid<-j
-    tmpdf$model<-'discrimination_lm'
-    tmpdfs[['causal_discrimination_lm']]<-tmpdf
+    # #discrimination by school and labor market
+    # mdiscrimination_slm <- lm(
+    #   data=mydf,
+    #   formula=earnings_f ~ 
+    #     race_i + 
+    #     nhood_raw
+    # )
+    # m.tmp<-mdiscrimination_slm
+    # msum<-summary(m.tmp)
+    # tmpdf<-data.frame(msum$coefficients)
+    # names(tmpdf)<-c("mu","se","tval","pval")
+    # tmpdf$var<-row.names(tmpdf) 
+    # row.names(tmpdf)<-NULL
+    # #add any missing rows
+    # allvars<-attr(mdiscrimination_slm$terms,'term.labels')
+    # if ( sum(!allvars%in%tmpdf$var) > 0) {
+    #   newrow<-data.frame(
+    #     var = allvars[!allvars%in%tmpdf$var]
+    #   ) 
+    # } else {
+    #   newrow <- NULL
+    # }
+    # tmpdf<-rbind.fill(tmpdf,newrow)
+    # tmpdf$agentid<-j
+    # tmpdf$model<-'discrimination_slm'
+    # tmpdfs[['causal_discrimination_slm']]<-tmpdf
+    # 
+    # #discrimination by labor market only
+    # mdiscrimination_lm <- lm(
+    #   data=mydf,
+    #   formula=earnings_f ~ 
+    #     race_i + 
+    #     school_raw
+    # )
+    # m.tmp<-mdiscrimination_lm
+    # msum<-summary(m.tmp)
+    # tmpdf<-data.frame(msum$coefficients)
+    # names(tmpdf)<-c("mu","se","tval","pval")
+    # tmpdf$var<-row.names(tmpdf) 
+    # row.names(tmpdf)<-NULL
+    # #add any missing rows
+    # allvars<-attr(mdiscrimination_lm$terms,'term.labels')
+    # if ( sum(!allvars%in%tmpdf$var) > 0) {
+    #   newrow<-data.frame(
+    #     var = allvars[!allvars%in%tmpdf$var]
+    #   ) 
+    # } else {
+    #   newrow <- NULL
+    # }
+    # tmpdf<-rbind.fill(tmpdf,newrow)
+    # tmpdf$agentid<-j
+    # tmpdf$model<-'discrimination_lm'
+    # tmpdfs[['causal_discrimination_lm']]<-tmpdf
     
     
     #get estimates of share explained via 42
     mymods <- list(
       normal = m,
       #quantile = mq,
-      race = mrace,
-      discrimination_slm = mdiscrimination_slm,
-      discrimination_lm = mdiscrimination_lm
+      race = mrace#,
+      # discrimination_slm = mdiscrimination_slm,
+      # discrimination_lm = mdiscrimination_lm
     )
     tmpdf <- lapply(seq_along(mymods),function(k) {
       #k<-1

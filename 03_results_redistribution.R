@@ -84,13 +84,11 @@ load(
 
 #how each of these matters can itself be made to vary
 
-#below, standard model is p(redistribution) rises 
+#below, standard model is p(redistribution) = f(...)
 #+ with class coefficent
 #+ with race coefficient (total)
 #- with ability coefficient
 #- with own income
-
-#we explore, optionally
 #+ with descriptive inequality
 #+ with luck/share of variance unexplained
 

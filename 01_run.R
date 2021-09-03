@@ -48,7 +48,7 @@ gs.list<-list()
 
 #the indirect effect
 race_indirect <- 0.75 
-#this necessary to roughly equalize race=class=ability
+#this is helpful to equalize race=class=ability, roughly
 
 #loop through these
 loopdf<-expand.grid(
@@ -442,52 +442,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'normal'
     tmpdfs[['causal_normal']]<-tmpdf
     
-    # #save the relaimpo inferences, separately
-    # #relaimpo doesn't run when a var (i.e. race) cant be estimated
-    # #so we have to drop the vars which yield NA inferences
-    # relimp_vars <- tmpdf$var[!is.na(tmpdf$mu) & tmpdf$var!="(Intercept)"]
-    # m.relimp <- calc.relimp(
-    #   object=mydf$earnings_f,
-    #   x = mydf[,relimp_vars,with=F]
-    # )
-    # tmpdf <- data.frame(
-    #   mu = c(1 - m.relimp@R2,m.relimp@lmg),
-    #   var = c("luck",names(m.relimp@lmg)),
-    #   agentid = j,
-    #   model = 'normal_relimp'
-    # )
-    # row.names(tmpdf)<-NULL
-    # tmpdfs[['causal_normal_relimp']] <- tmpdf
-    
-    #DEPRECATED
-    # #quantile model
-    # mq<-lm(
-    #   data=mydf,
-    #   formula=earnings_f_q ~ 
-    #     income_i_q + 
-    #     ability_i_q + 
-    #     race_i
-    # )
-    # m.tmp<-mq
-    # msum<-summary(m.tmp)
-    # tmpdf<-data.frame(msum$coefficients)
-    # names(tmpdf)<-c("mu","se","tval","pval")
-    # tmpdf$var<-row.names(tmpdf) 
-    # row.names(tmpdf)<-NULL
-    # #add any missing rows
-    # allvars<-attr(mq$terms,'term.labels')
-    # if ( sum(!allvars%in%tmpdf$var) > 0 ) {
-    #   newrow<-data.frame(
-    #     var = allvars[!allvars%in%tmpdf$var]
-    #   ) 
-    # } else {
-    #   newrow <- NULL
-    # }
-    # tmpdf$var<-str_replace(tmpdf$var,"\\_q$","") #rename
-    # tmpdf<-rbind.fill(tmpdf,newrow)
-    # tmpdf$agentid<-j
-    # tmpdf$model<-'quantile'
-    # tmpdfs[['causal_quantile']]<-tmpdf
+
     mq <- NULL 
     
     #race-only model
@@ -516,68 +471,10 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'race'
     tmpdfs[['causal_race']]<-tmpdf
     
-    # #discrimination by school and labor market
-    # mdiscrimination_slm <- lm(
-    #   data=mydf,
-    #   formula=earnings_f ~ 
-    #     race_i + 
-    #     nhood_raw
-    # )
-    # m.tmp<-mdiscrimination_slm
-    # msum<-summary(m.tmp)
-    # tmpdf<-data.frame(msum$coefficients)
-    # names(tmpdf)<-c("mu","se","tval","pval")
-    # tmpdf$var<-row.names(tmpdf) 
-    # row.names(tmpdf)<-NULL
-    # #add any missing rows
-    # allvars<-attr(mdiscrimination_slm$terms,'term.labels')
-    # if ( sum(!allvars%in%tmpdf$var) > 0) {
-    #   newrow<-data.frame(
-    #     var = allvars[!allvars%in%tmpdf$var]
-    #   ) 
-    # } else {
-    #   newrow <- NULL
-    # }
-    # tmpdf<-rbind.fill(tmpdf,newrow)
-    # tmpdf$agentid<-j
-    # tmpdf$model<-'discrimination_slm'
-    # tmpdfs[['causal_discrimination_slm']]<-tmpdf
-    # 
-    # #discrimination by labor market only
-    # mdiscrimination_lm <- lm(
-    #   data=mydf,
-    #   formula=earnings_f ~ 
-    #     race_i + 
-    #     school_raw
-    # )
-    # m.tmp<-mdiscrimination_lm
-    # msum<-summary(m.tmp)
-    # tmpdf<-data.frame(msum$coefficients)
-    # names(tmpdf)<-c("mu","se","tval","pval")
-    # tmpdf$var<-row.names(tmpdf) 
-    # row.names(tmpdf)<-NULL
-    # #add any missing rows
-    # allvars<-attr(mdiscrimination_lm$terms,'term.labels')
-    # if ( sum(!allvars%in%tmpdf$var) > 0) {
-    #   newrow<-data.frame(
-    #     var = allvars[!allvars%in%tmpdf$var]
-    #   ) 
-    # } else {
-    #   newrow <- NULL
-    # }
-    # tmpdf<-rbind.fill(tmpdf,newrow)
-    # tmpdf$agentid<-j
-    # tmpdf$model<-'discrimination_lm'
-    # tmpdfs[['causal_discrimination_lm']]<-tmpdf
-    
-    
-    #get estimates of share explained via 42
+    #get estimates of share of variance explained 
     mymods <- list(
       normal = m,
-      #quantile = mq,
-      race = mrace#,
-      # discrimination_slm = mdiscrimination_slm,
-      # discrimination_lm = mdiscrimination_lm
+      race = mrace
     )
     tmpdf <- lapply(seq_along(mymods),function(k) {
       #k<-1
@@ -619,7 +516,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
   #returning all info from these worlds
   returnlist<-list(
     agentsdf=agentsdf,
-    #networks=networks,
+    #networks=networks, #if we want to return networks..
     inferencesdf=inferencesdf
   )
   

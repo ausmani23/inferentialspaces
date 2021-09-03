@@ -237,7 +237,7 @@ tmpdf$race_ability <- tmpdf$race_i - tmpdf$ability_i
 median(tmpdf$class_ability) 
 median(tmpdf$class_race) 
 median(tmpdf$race_ability) 
-#pretty well-calibrated! 
+#pretty well-calibrated
 
 ### direct > indirect
 
@@ -309,7 +309,7 @@ median(tmpdf$class_ability)
 median(tmpdf$class_race) 
 median(tmpdf$race_ability) 
 #race < smaller than the rest, 
-#but this is just robustness
+#but this is just robustness check,
 #no big deal.. 
 
 #########################################################

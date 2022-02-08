@@ -1,6 +1,6 @@
 # Segregated Social Worlds
 
-This repository contains replication materials for "Segregated Social Worlds Perpetuate Inequality", by Jonathan Mijs and Adaner Usmani.
+This repository contains replication materials for "Segregated Social Worlds..."
 
 + 01_run.R: Runs the simulations 
 + 02_results.R: Summarizes the key results of the paper, except for results having to do with p(redistribution). 

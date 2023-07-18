@@ -50,6 +50,9 @@ output <- function(df,tmpname) {
   )
 }
 
+#set up stats list
+stats.list <- list()
+
 #########################################################
 #########################################################
 
@@ -58,6 +61,22 @@ setwd(filesdir)
 load(
   '01_run.RData'
 )
+
+#in case running on diff computers
+#and .RData has reset wdirs
+#you'll need to set them back
+filesdir<-getwd()
+setwd('..')
+homedir<-getwd()
+outputdir<-file.path(
+  homedir,
+  "output"
+)
+filesdir<-file.path(
+  homedir,
+  "files"
+)
+
 
 #########################################################
 #########################################################
@@ -200,18 +219,18 @@ phatdf <- lapply(tmpseq.i,function(i) {
 #########################################################
 
 #fix loopdf
-loopdf$network<-"random"
-loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
-loopdf$network[loopdf$share_in_nhood==0.90]<- "nhood95"
-loopdf$network[loopdf$share_in_school==1]<-"school"
-loopdf$network[loopdf$share_in_school==0.90]<- "school95"
-loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
-loopdf$network[loopdf$share_in_earnings==0.90]<-"earnings95"
-loopdf$share_in_school<-
-  loopdf$share_in_earnings<-
-  loopdf$share_in_nhood<-
-  loopdf$share_random<-NULL
-loopdf
+# loopdf$network<-"random"
+# loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
+# loopdf$network[loopdf$share_in_nhood==0.90]<- "nhood95"
+# loopdf$network[loopdf$share_in_school==1]<-"school"
+# loopdf$network[loopdf$share_in_school==0.90]<- "school95"
+# loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
+# loopdf$network[loopdf$share_in_earnings==0.90]<-"earnings95"
+# loopdf$share_in_school<-
+#   loopdf$share_in_earnings<-
+#   loopdf$share_in_nhood<-
+#   loopdf$share_random<-NULL
+# loopdf
 
 tmp<-loopdf$beta_race_school==0 & 
   loopdf$beta_race_earnings==0
@@ -255,8 +274,8 @@ tmplabels<-c(
   "Workplace",
   "Mostly Workplace"
 )
-fulldf$network<-factor(
-  fulldf$network,
+fulldf$network_stage<-factor(
+  fulldf$network_stage,
   tmplevels,
   tmplabels
 )
@@ -292,7 +311,7 @@ plotdf <- fulldf[
   ,
   by=c(
     'modname',
-    'network',
+    'network_stage',
     'seed'
   )
 ]
@@ -306,7 +325,7 @@ plotdf<-plotdf[
   ,
   by=c(
     'modname',
-    'network'
+    'network_stage'
   )
   ]
 
@@ -339,7 +358,7 @@ g.tmp<-ggplot(
     y=mu,
     ymin=mu.min,
     ymax=mu.max,
-    color=network
+    color=network_stage
   )
 ) +
   geom_point(
@@ -368,7 +387,7 @@ tmpname<-"fig_redistribution.pdf"
 ggsave(
   plot=g.tmp,
   filename=tmpname,
-  width=6*1.25,
+  width=7*1.25,
   height=4*1.25
 )
 output(plotdf,tmpname)

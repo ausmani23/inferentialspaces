@@ -50,6 +50,9 @@ output <- function(df,tmpname) {
   )
 }
 
+#set up stats list
+stats.list <- list()
+
 #########################################################
 #########################################################
 
@@ -57,6 +60,21 @@ output <- function(df,tmpname) {
 setwd(filesdir)
 load(
   '01_run.RData'
+)
+
+#in case running on diff computers
+#and .RData has reset wdirs
+#you'll need to set them back
+filesdir<-getwd()
+setwd('..')
+homedir<-getwd()
+outputdir<-file.path(
+  homedir,
+  "output"
+)
+filesdir<-file.path(
+  homedir,
+  "files"
 )
 
 #retrieve inferences, 
@@ -69,14 +87,13 @@ infdf<-lapply(
 rm(fulloutput) #don't keep this in memory
 
 #use the N+1'th agent as baseline
-  infdf$se<-
+infdf$se<-
   infdf$tval<-
   infdf$pval<-
   # infdf$mu.min<-
   # infdf$mu.max<-
   # infdf$pval.class<-
   NULL
-
 
 #set N+1th agent to be the baseline
 infdf<-dcast.data.table(
@@ -95,7 +112,6 @@ infdf<-melt.data.table(
 ) %>% data.table
 infdf$mu_bias<- infdf$mu - infdf$baseline
 #infdf$baseline<-NULL
-
 
 #fix vars
 infdf$var %>% unique
@@ -141,18 +157,15 @@ infdf$var<-factor(
 #########################################################
 
 #fix loopdf
-loopdf$network<-"random"
-loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
-loopdf$network[loopdf$share_in_nhood==0.90]<- "nhood95"
-loopdf$network[loopdf$share_in_school==1]<-"school"
-loopdf$network[loopdf$share_in_school==0.90]<- "school95"
-loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
-loopdf$network[loopdf$share_in_earnings==0.90]<-"earnings95"
-loopdf$share_in_school<-
-  loopdf$share_in_earnings<-
-  loopdf$share_in_nhood<-
-  loopdf$share_random<-NULL
-loopdf
+#loopdf$network<-loopdf$network_stage
+# loopdf$network[loopdf$share_in_nhood==1]<-"nhood"
+# loopdf$network[loopdf$share_in_school==1]<-"school"
+# loopdf$network[loopdf$share_in_earnings==1]<-"earnings"
+# loopdf$share_in_school<-
+#   loopdf$share_in_earnings<-
+#   loopdf$share_in_nhood<-
+#   loopdf$share_random<-NULL
+#loopdf
 
 tmp<-loopdf$beta_race_school==0 & 
   loopdf$beta_race_earnings==0 & 
@@ -190,11 +203,11 @@ tmplabels<-c(
   "Mostly Workplace"
 )
 infdf$group<-factor(
-  infdf$network,
+  infdf$network_stage,
   tmplevels,
   tmplabels
 )
-infdf[,network:=NULL] #rename
+infdf[,network_stage:=NULL] #rename
 
 #########################################################
 #########################################################
@@ -326,14 +339,14 @@ tmpdf1<-infdf[
     world=='yesdiscrimination' &
     main=="main" #not robustness 
 ]
-tmpdf1$inference<-c("Causal (Coefficients)")
+tmpdf1$inference<-c("B. Causal (Coefficients)")
 tmpdf2<-infdf[
   model=='inequality' &
     world=='yesdiscrimination' &
     main=="main"
 ]
 tmpdf2$var<-c("Inequality")
-tmpdf2$inference<-c("Descriptive")
+tmpdf2$inference<-c("A. Descriptive")
 
 tmpdf3<-infdf[
   oldvar%in%c("r2") & 
@@ -344,7 +357,7 @@ tmpdf3<-infdf[
 #put in terms of luck, not r2
 tmpdf3$mu <- 1 - tmpdf3$mu; tmpdf3$baseline <- 1 - tmpdf3$baseline 
 tmpdf3$var<-c("Luck")
-tmpdf3$inference<-c("Causal (Luck)")
+tmpdf3$inference<-c("C. Causal (Luck)")
 
 plotdf<-rbind.fill(
   tmpdf1,
@@ -359,6 +372,8 @@ plotdf<-plotdf[
   )
   ,
   by=c(
+    'network_formation',
+    'friendsize',
     'inference',
     'group',
     'var',
@@ -374,6 +389,8 @@ plotdf<-plotdf[
   )
   ,
   by=c(
+    'network_formation',
+    'friendsize',
     'inference',
     'group',
     'var'
@@ -397,6 +414,8 @@ extradf<-extradf[
   )
   ,
   by=c(
+    'network_formation',
+    'friendsize',
     'inference',
     'var'
   )
@@ -412,9 +431,9 @@ plotdf<-rbind.fill(
 
 #sort levels/colors/etc.
 tmplevels <- c(
-  "Descriptive",
-  "Causal (Coefficients)",
-  "Causal (Luck)"
+  "A. Descriptive",
+  "B. Causal (Coefficients)",
+  "C. Causal (Luck)"
 )
 plotdf$inference<-factor(
   plotdf$inference,
@@ -450,8 +469,8 @@ g.tmp <- ggplot(
   aes(
     x=var,
     y=mu,
-    ymin=mu.min,
-    ymax=mu.max,
+    # ymin=mu.min,
+    # ymax=mu.max,
     color=group#,
     #shape=extra#,
     #alpha=extra
@@ -462,6 +481,7 @@ g.tmp <- ggplot(
     position=position_dodge(0.4)
   ) +
   geom_linerange(
+    aes(ymin=mu.min,ymax=mu.max),
     size=1.25,
     position=position_dodge(0.4)
   ) +
@@ -470,33 +490,29 @@ g.tmp <- ggplot(
     values=tmpcolors
   ) +
   # scale_alpha_manual(
-  #   guide=F,
+  #   guide='none',
   #   values=tmpalphas
   # ) +
   scale_shape_manual(
-    guide=F,
+    guide='none',
     values=tmpshapes
   ) +
   coord_flip() +
   xlab("") + 
   ylab("\nEstimate") +
-  # facet_wrap(
-  #   inference ~ .,
-  #   ncol=1,
-  #   scales='free'
-  # ) +
+  #facet_wrap(
+  #  network_formation ~ friendsize,
+  #) +
+  facet_wrap(
+    inference ~ .,
+    ncol=1,
+    scales='free'
+  ) +
   theme_bw() +
   theme(
     legend.position='top',
     legend.direction='horizontal'
   )
-
-g.tmp <- g.tmp + ggforce::facet_col(
-  vars(inference), 
-  scales='free',
-  space='free'
-)
-
 
 tmpname<-"fig_inferences.pdf"
 setwd(outputdir)
@@ -565,6 +581,7 @@ tmpdf <- tmpdf[
   )
   ,
   by=c(
+    'network_formation',
     'group',
     'seed'
   )
@@ -612,6 +629,7 @@ tmpdf<-tmpdf[
   )
   ,
   by=c(
+    'network_formation',
     'group',
     'seed'
   )
@@ -640,6 +658,7 @@ plotdf<-tmpdf[
   )
   ,
   by=c(
+    'network_formation',
     'group',
     'stat'
   )
@@ -652,10 +671,10 @@ tmplevels<-c(
   "betweenshare"
 )
 tmplabels<-c(
-  "Total Racial Gap",
-  "Present-Day Discrimination",
-  "% of Gap Due to Present-Day Discrimination",
-  "Between-Race Inequality as % of Total"
+  "A. Total Racial Gap",
+  "B. Present-Day Discrimination",
+  "C. % of Gap Due to Present-Day Discrimination",
+  "D. Between-Race Inequality as % of Total"
 )
 plotdf$stat <- factor(
   plotdf$stat,
@@ -688,6 +707,7 @@ g.tmp<-ggplot(
   aes(
     x=group,
     y=mu,
+    #shape=network_formation,
     ymin=mu.min,
     ymax=mu.max,
     group=group,
@@ -703,7 +723,7 @@ g.tmp<-ggplot(
     position=position_dodge(0.4)
   ) +
   scale_color_manual(
-    guide=F,
+    guide='none',
     values=tmpcolors
   ) +
   coord_flip() +
@@ -810,10 +830,10 @@ tmplevels<-c(
   "betweenshare"
 )
 tmplabels<-c(
-  "Total Racial Gap",
-  "Discrimination",
-  "% of Gap Due to Discrimination",
-  "Between-Race Inequality as % of Total"
+  "A. Total Racial Gap",
+  "B. Discrimination",
+  "C. % of Gap Due to Discrimination",
+  "D. Between-Race Inequality as % of Total"
 )
 plotdf$stat <- factor(
   plotdf$stat,
@@ -871,7 +891,7 @@ g.tmp<-ggplot(
     color='black'
   ) +
   scale_color_manual(
-    guide=F,
+    guide='none',
     values=tmpcolors
   ) +
   coord_flip() +

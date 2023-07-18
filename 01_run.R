@@ -17,6 +17,7 @@ require(rprojroot)
 require(MASS)
 require(ggplot2)
 require(relaimpo)
+require(igraph)
 
 homedir<-find_root(
   criterion=has_file('_inferentialspaces.Rproj')
@@ -53,11 +54,13 @@ race_indirect <- 0.75
 #loop through these
 loopdf<-expand.grid(
   #many worlds
-  seed=1:10,
+  seed=1:100,
   #number of agents
   N_agents=1000,
   #network size
   netsize=100,
+  #friend size,
+  friendsize=0.8,#c(0.2,0.8),
   #income distribution
   income_dist=c('normal'),
   race_dist=c(0.36), #1 - white, nonhispanics in the USA  
@@ -78,11 +81,13 @@ loopdf<-expand.grid(
   beta_race_earnings=c(0,race_indirect/10), #no/yes discrimination
   beta_nhood_earnings=c(0),
   beta_school_earnings=c(1),
-  #how is network distributed across stages
-  share_random=c(0,1),
-  share_in_nhood=c(0,1),
-  share_in_school=c(0,1),
-  share_in_earnings=c(0,1),
+  #how are social networks formed
+  network_formation='smallworld',#c('smallworld','random'),
+  network_stage=c('random','nhood','school','earnings'),
+  # share_random=c(0,1),
+  # share_in_nhood=c(0,1),
+  # share_in_school=c(0,1),
+  # share_in_earnings=c(0,1),
   #how much does luck matter in our world
   luck=c(1),#,0.1)
   #rescale all vars to N(0,1) at every stage?
@@ -100,18 +105,18 @@ disc_vars <- c(
 )
 tmp<-round(
   apply(
-  loopdf[,disc_vars],
-  1,
-  sum
-),2)==round(race_indirect*3/10,2) #floating point problem
+    loopdf[,disc_vars],
+    1,
+    sum
+  ),2)==round(race_indirect*3/10,2) #floating point problem
 loopdf<-loopdf[tmp,]
 
-#get rid of all shares which don't add up to 1
-sharevars<-str_detect(names(loopdf),"share\\_")
-tmp<-apply(
-  loopdf[,sharevars],1,sum
-)==1
-loopdf<-loopdf[tmp,]
+# #get rid of all shares which don't add up to 1
+# sharevars<-str_detect(names(loopdf),"share\\_")
+# tmp<-apply(
+#   loopdf[,sharevars],1,sum
+# )==1
+# loopdf<-loopdf[tmp,]
 
 #########################################################
 #########################################################
@@ -120,7 +125,7 @@ loopdf<-loopdf[tmp,]
 robustness<-T
 if(robustness) {
   
-  #get basic loopdf; decide how many see ds you want
+  #get basic loopdf; decide how many seeds you want
   robustness_seeds <- ifelse(max(loopdf$seed)==10,5,10)
   basedf<-loopdf[loopdf$seed%in%c(1:robustness_seeds),]
   
@@ -171,7 +176,7 @@ if(robustness) {
 loopdf$i<-1:nrow(loopdf); print(nrow(loopdf))
 fulloutput<-lapply(loopdf$i,function(i) {
   
-  #i<-1
+  #i<-7
   
   #tracker
   pct_done <- round(i/nrow(loopdf) * 100)
@@ -188,7 +193,12 @@ fulloutput<-lapply(loopdf$i,function(i) {
   #all groups will be the same size
   N_groups <- thisrow$N_agents/
     thisrow$netsize
-  
+  #how large are networks
+  smallw_factor <- 
+    thisrow$netsize/
+    ((thisrow$friendsize * thisrow$netsize)/2)
+  random_factor<-thisrow$friendsize
+
   #generate agents
   agentsdf<-data.frame(
     agentid=1:thisrow$N_agents,
@@ -313,59 +323,159 @@ fulloutput<-lapply(loopdf$i,function(i) {
   ) %>% as.numeric
   
   ###they form social networks
-  networks<-lapply(1:thisrow$N_agents,function(j) {
-    #print(j)
-    #j<-1
+  #networks is a list, by agent, of who each is connected to
+  if ( thisrow$network_formation == 'smallworld' ) {
     
-    #go through different stages and form networks
-    mynetwork<-c()
     
-    #random
-    mynetwork<-c(
-      mynetwork,
-      sample(
-        agentsdf$agentid[agentsdf$agentid!=j],
-        thisrow$share_random * thisrow$netsize * 0.8
+    if(thisrow$network_stage=='random') {
+      
+      g <- sample_smallworld(
+        1,
+        nrow(agentsdf), #number of agents
+        nrow(agentsdf)/(smallw_factor*10), #regulates # of connections
+        0.05
       )
-    )
+      g_list <- get.edgelist(g)
+      networks<-lapply(1:nrow(agentsdf),function(i) {
+        as.vector(neighbors(g,V(g)[i]))
+      })
+      
+    } else if (thisrow$network_stage=='nhood') {
+      
+      #loop through neighborhoods
+      networks <- lapply( 1:max(agentsdf$nhood_proper) ,function(i) {
+        #i<-1
+        #these are the agents in this nhood
+        myagents <- agentsdf$agentid[agentsdf$nhood_proper==i]
+        #in each neigbhorhood, create a network
+        g <- sample_smallworld(
+          1,
+          length(myagents),
+          length(myagents)/smallw_factor,
+          0.05
+        )
+        g_list <- get.edgelist(g)
+        tmpnetworks<-lapply(1:length(myagents),function(i) {
+          #get neighbors, in terms of myagents vector
+          myagents[as.vector(neighbors(g,V(g)[i]))]
+        })
+        names(tmpnetworks)<-myagents
+        tmpnetworks
+      }) %>% 
+        Reduce(f='c') #makes it a single list
+      #order this by agentid
+      networks <- networks[order(as.numeric(names(networks)))] 
+      networks <- unname(networks) #then it can be unnamed
+      
+    } else if (thisrow$network_stage=='school') {
+      
+      #loop through schools
+      networks <- lapply( 1:max(agentsdf$school_proper) ,function(i) {
+        #i<-1
+        #these are the agents in this nhood
+        myagents <- agentsdf$agentid[agentsdf$school_proper==i]
+        #in each neigbhorhood, create a network
+        g <- sample_smallworld(
+          1,
+          length(myagents),
+          length(myagents)/smallw_factor,
+          0.05
+        )
+        g_list <- get.edgelist(g)
+        tmpnetworks<-lapply(1:length(myagents),function(i) {
+          #get neighbors, in terms of myagents vector
+          myagents[as.vector(neighbors(g,V(g)[i]))]
+        })
+        names(tmpnetworks)<-myagents
+        tmpnetworks
+      }) %>% 
+        Reduce(f='c') #makes it a single list
+      #order this by agentid
+      networks <- networks[order(as.numeric(names(networks)))] 
+      networks <- unname(networks) #then it can be unnamed
+      
+    } else if (thisrow$network_stage=='earnings') {
+      
+      #loop through schools
+      networks <- lapply( 1:max(agentsdf$earnings_proper) ,function(i) {
+        #i<-1
+        #these are the agents in this nhood
+        myagents <- agentsdf$agentid[agentsdf$earnings_proper==i]
+        #in each neigbhorhood, create a network
+        g <- sample_smallworld(
+          1,
+          length(myagents),
+          length(myagents)/smallw_factor, 
+          0.05
+        )
+        g_list <- get.edgelist(g)
+        tmpnetworks<-lapply(1:length(myagents),function(i) {
+          #get neighbors, in terms of myagents vector
+          myagents[as.vector(neighbors(g,V(g)[i]))]
+        })
+        #get my own name, in terms of my agents vector
+        names(tmpnetworks)<-myagents
+        tmpnetworks
+      }) %>% 
+        Reduce(f='c') #makes it a single list
+      #order this by agentid
+      networks <- networks[order(as.numeric(names(networks)))] 
+      networks <- unname(networks) #then it can be unnamed
+      
+    }
     
-    #nhood
-    thisnhood<-agentsdf$nhood_proper[agentsdf$agentid==j]
-    mynetwork<-c(
-      mynetwork,
-      sample(
-        agentsdf$agentid[agentsdf$nhood_proper==thisnhood & agentsdf$agentid!=j],
-        thisrow$share_in_nhood * thisrow$netsize * 0.8,
-        replace=F
-      )
-    )
+  } else if ( thisrow$network_formation=='random' ) {
     
-    #school
-    thisschool<-agentsdf$school_proper[agentsdf$agentid==j]
-    mynetwork<-c(
-      mynetwork,
-      sample(
-        agentsdf$agentid[agentsdf$school_proper==thisschool & agentsdf$agentid!=j],
-        thisrow$share_in_school * thisrow$netsize * 0.8,
-        replace=F
-      )
-    )
+    #if ties are formed at random, either overall or within-place
+    #this is easier: we don't need to form smallwork networks, first
     
-    #earnings
-    thisearnings<-agentsdf$earnings_proper[agentsdf$agentid==j]
-    mynetwork<-c(
-      mynetwork,
-      sample(
-        agentsdf$agentid[agentsdf$earnings_proper==thisearnings & agentsdf$agentid!=j],
-        thisrow$share_in_earnings * thisrow$netsize * 0.8,
-        replace=F
-      )
-    )
+    networks<-lapply(1:thisrow$N_agents,function(j) {
+      #print(j)
+      #j<-1
+      
+      if(thisrow$network_stage=='random') {
+        
+        mynetwork<-sample(
+          agentsdf$agentid[agentsdf$agentid!=j],
+          thisrow$netsize * random_factor,
+          replace=F
+        )
+        
+      } else if (thisrow$network_stage=='nhood') {
+        
+        thisnhood<-agentsdf$nhood_proper[agentsdf$agentid==j]
+        mynetwork<-sample(
+          agentsdf$agentid[agentsdf$nhood_proper==thisnhood & agentsdf$agentid!=j],
+          thisrow$netsize * random_factor,
+          replace=F
+        )
+        
+      } else if (thisrow$network_stage=='school') {
+        
+        thisschool<-agentsdf$school_proper[agentsdf$agentid==j]
+        mynetwork<-sample(
+          agentsdf$agentid[agentsdf$school_proper==thisschool & agentsdf$agentid!=j],
+          thisrow$netsize * random_factor,
+          replace=F
+        )
+        
+      } else if (thisrow$network_stage=='earnings') {
+        
+        thisearnings<-agentsdf$earnings_proper[agentsdf$agentid==j]
+        mynetwork<-sample(
+          agentsdf$agentid[agentsdf$earnings_proper==thisearnings & agentsdf$agentid!=j],
+          thisrow$netsize * random_factor,
+          replace=F
+        )
+        
+      }
+      
+      #return
+      mynetwork
+    })
     
-    #return
-    mynetwork
-  })
-  
+  }
+
   ###fourth, everyone looks at their networks and draws inferences
   ###(we also loop through once extra, and calculate everything unconstrained;
   ###this gives us God's estimate; ground truth)
@@ -442,7 +552,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
     tmpdf$model<-'normal'
     tmpdfs[['causal_normal']]<-tmpdf
     
-
+    
     mq <- NULL 
     
     #race-only model
@@ -491,7 +601,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
       ess <- sum( 
         (thism$fitted.values - mean(thism$model$earnings_f))^2 
       )
-    
+      
       data.frame(
         agentid = j,
         model = names(mymods)[k],

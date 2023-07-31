@@ -240,7 +240,7 @@ tmpdf<-tmpdf[
     'seed'
   )
 ]
-tmpdf<-spread(tmpdf,oldvar,mu)
+tmpdf<-spread(tmpdf,oldvar,mu) %>% data.table
 
 tmpdf$class_ability <- tmpdf$income_i - tmpdf$ability_i
 tmpdf$class_race <- tmpdf$income_i - tmpdf$race_i
@@ -273,7 +273,7 @@ tmpdf<-tmpdf[
     'main'
   )
 ]
-tmpdf<-spread(tmpdf,model,mu)
+tmpdf<-spread(tmpdf,model,mu) %>% data.table
 
 #centered roughly where we want.. 
 quantile(tmpdf$normal/tmpdf$race,c(0.025,0.5,0.975)) #pretty good
@@ -307,7 +307,7 @@ tmpdf<-tmpdf[
     'seed'
   )
 ]
-tmpdf<-spread(tmpdf,varmodel,mu)
+tmpdf<-spread(tmpdf,varmodel,mu) %>% data.table
 
 #direct indirect
 quantile(tmpdf$race_normal/tmpdf$race_race,c(0.025,0.5,0.975)) #perfect
@@ -563,7 +563,7 @@ tmpdf<-spread(
   tmpdf,
   model,
   mu
-)
+) %>% data.table
 
 #what fraction of the racial gap is attributed to discrimination? 
 tmpdf$pct_discrimination <- 100 * tmpdf$normal/tmpdf$race
@@ -621,7 +621,7 @@ tmpdf<-spread(
   tmpdf,
   model,
   mu
-)
+) %>% data.table
 tmpdf<-tmpdf[
   ,
   .(
@@ -781,7 +781,7 @@ tmpdf<-spread(
   tmpdf,
   model,
   mu
-)
+) %>% data.table
 #what fraction of the racial gap is attributed to discrimination? 
 tmpdf$pct_discrimination <- 100 * tmpdf$normal/tmpdf$race
 tmpdf$discrimination <- tmpdf$normal

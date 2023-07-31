@@ -6,6 +6,7 @@
 .Ruserdata
 
 #folders
+data/
 files/
 output/
 writing/

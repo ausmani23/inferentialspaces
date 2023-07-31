@@ -666,15 +666,15 @@ plotdf<-tmpdf[
 
 tmplevels<-c(
   "racialgap",
+  "betweenshare",
   "discrimination",
-  "pct_discrimination",
-  "betweenshare"
+  "pct_discrimination"
 )
 tmplabels<-c(
   "A. Total Racial Gap",
-  "B. Present-Day Discrimination",
-  "C. % of Gap Due to Present-Day Discrimination",
-  "D. Between-Race Inequality as % of Total"
+  "B. Between-Race Inequality as % of Total",
+  "C. Present-Day Discrimination",
+  "D. % of Gap Due to Present-Day Discrimination"
 )
 plotdf$stat <- factor(
   plotdf$stat,

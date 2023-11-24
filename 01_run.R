@@ -176,7 +176,7 @@ if(robustness) {
 loopdf$i<-1:nrow(loopdf); print(nrow(loopdf))
 fulloutput<-lapply(loopdf$i,function(i) {
   
-  #i<-7
+  #i<-1
   
   #tracker
   pct_done <- round(i/nrow(loopdf) * 100)
@@ -478,7 +478,7 @@ fulloutput<-lapply(loopdf$i,function(i) {
 
   ###fourth, everyone looks at their networks and draws inferences
   ###(we also loop through once extra, and calculate everything unconstrained;
-  ###this gives us God's estimate; ground truth)
+  ###this gives us God's estimate; which we take as ground truth)
   inferencesdf<-lapply(1:(thisrow$N_agents+1),function(j) {
     
     #j<-1001
@@ -495,27 +495,35 @@ fulloutput<-lapply(loopdf$i,function(i) {
     }
     mydf<-agentsdf[agentsdf$agentid%in%myfriends]
     
+
     
     #store dfs
     tmpdfs<-list()
     
     ###inequality of earnings
+    tmpf<-ecdf(mydf$earnings_f) #for perceived pos
     tmpdf<-data.frame(
       agentid=j,
       model=c(
         'inequality',
         'totalss',
         'withinss',
-        'betweenss'
+        'betweenss',
+        'perpos' #perceived position
       ),
       var="var",
       mu=c(
-        var(mydf$earnings_f),
-        (mydf$earnings_f - mean(mydf$earnings_f))^2 %>% sum,
-        tapply(mydf$earnings_f,mydf$race_i,function(x) sum((x - mean(x))^2 ) ) %>% sum,
+        var(mydf$earnings_f), #total variance
+        (mydf$earnings_f - mean(mydf$earnings_f))^2 %>% sum, #total sum of squares
+        tapply(mydf$earnings_f,mydf$race_i,function(x) sum((x - mean(x))^2 ) ) %>% sum, #within-group sum of squares
         (unlist(
           tapply(mydf$earnings_f,mydf$race_i,function(x) rep(mean(x),length(x)) )
-        ) - mean(mydf$earnings_f))^2 %>% sum
+        ) - mean(mydf$earnings_f))^2 %>% sum, #between sum of squares
+        ifelse(
+          j<=thisrow$N_agents,
+          100 * tmpf(agentsdf$earnings_f[agentsdf$agentid==j]),
+          NA
+          )#agent's own perceived position in distribution
       )
     )
     tmpdfs[['descriptive']]<-tmpdf

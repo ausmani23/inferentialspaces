@@ -345,10 +345,10 @@ plotdf$modname <- factor(
 
 tmpcolors<-c(
   'Ground Truth'='grey',
-  'Integrated'='#e41a1c',
-  'Neighborhood'='#377eb8',
-  'School'='#4daf4a',
-  'Workplace'='#984ea3'
+  'Integrated'='#ff2c1f',
+  'Neighborhood'='#2171b5',
+  'School'='#2ca02c',
+  'Workplace'='#ff7f0e'
 )
 
 g.tmp<-ggplot(

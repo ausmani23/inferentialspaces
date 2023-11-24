@@ -452,11 +452,11 @@ plotdf$group<-factor(
   tmplevels
 )
 tmpcolors<-c(
-  'grey',
-  '#e41a1c',
-  '#377eb8',
-  '#4daf4a',
-  '#984ea3'
+  'grey',       
+  '#ff2c1f',    
+  '#2171b5',     
+  '#2ca02c',    
+  '#ff7f0e' 
 )
 names(tmpcolors)<-tmplevels
 
@@ -524,6 +524,98 @@ ggsave(
 )
 output(plotdf,tmpname)
 
+#plot this an alternative way, to fix the faceting
+
+data_list <- split(plotdf, plotdf$inference)
+plot_list <- lapply(seq_along(data_list), function(i) {
+  myg <- ggplot(
+    data_list[[i]],
+    aes(
+      x=var,
+      y=mu,
+      # ymin=mu.min,
+      # ymax=mu.max,
+      color=group#,
+      #shape=extra#,
+      #alpha=extra
+    )
+  ) +
+    geom_point(
+      size=2,
+      position=position_dodge(0.4)
+    ) +
+    geom_linerange(
+      aes(ymin=mu.min,ymax=mu.max),
+      size=1.25,
+      position=position_dodge(0.4)
+    ) +
+    # scale_color_manual(
+    #   name="",#,Social World",
+    #   values=tmpcolors
+    # ) +
+    # scale_alpha_manual(
+    #   guide='none',
+    #   values=tmpalphas
+    # ) +
+    scale_shape_manual(
+      guide='none',
+      values=tmpshapes
+    ) +
+    coord_flip() +
+    xlab("") + 
+    ylab("") +
+    #ylab("\nEstimate") +
+    #facet_wrap(
+    #  network_formation ~ friendsize,
+    #) +
+    # facet_wrap(
+    #   inference ~ .,
+    #   ncol=1,
+    #   scales='free'
+    # ) +
+    theme_bw() +
+    theme(
+      legend.position='top',
+      legend.direction='horizontal'
+    )
+  
+  if(i==1) {
+    myg <- myg + scale_color_manual(
+      name="",#,Social World",
+      values=tmpcolors
+    )
+  } else {
+    myg <- myg + scale_color_manual(
+      values=tmpcolors,
+      guide='none'
+    )
+  }
+  
+  if(i==3) {
+    myg <- myg + ylab('\nEstimate')
+  } 
+  
+  myg
+  
+})
+
+require(patchwork)
+g.tmp <- 
+  plot_list[[1]] + 
+  plot_list[[2]] + 
+  plot_list[[3]] +
+  plot_layout(
+    ncol=1,
+    heights=c(1,3,1)
+    )
+tmpname<-"fig_inferences2.pdf"
+setwd(outputdir)
+ggsave(
+  plot=g.tmp,
+  filename=tmpname,
+  width=4*1.5,
+  height=6*1.5
+)
 
 #########################################################
 #########################################################
@@ -694,11 +786,11 @@ plotdf$group<-factor(
   tmplevels
 )
 tmpcolors<-c(
-  'grey',
-  '#e41a1c',
-  '#377eb8',
-  '#4daf4a',
-  '#984ea3'
+  'grey',       
+  '#ff2c1f',    
+  '#2171b5',     
+  '#2ca02c',    
+  '#ff7f0e' 
 )
 names(tmpcolors)<-tmplevels
 

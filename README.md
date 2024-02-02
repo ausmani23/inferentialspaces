@@ -1,6 +1,6 @@
-# Segregated Social Worlds
+# How Segregation Ruins Inference
 
-This repository contains replication materials for "Segregated Social Worlds..."
+This repository contains replication materials for "How Segregation Ruins Inference" by Jonathan Mijs and Adaner Usmani. Please contact Adaner if you have any questions about the replication materials. 
 
 + 01_run.R: Runs the simulations 
 + 02_results.R: Summarizes the key results of the paper, except for results having to do with p(redistribution). 
